@@ -1,0 +1,5 @@
+dlat,dlon,horas_atras,confianca,frp
+-0.030,0.025,2,alta,12.4
+-0.0305,0.0255,2,nominal,6.8
+0.045,-0.040,5,nominal,4.1
+0.020,0.070,9,alta,18.9

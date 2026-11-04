@@ -1,0 +1,6 @@
+{
+  "_leia": "Comunidades da área piloto. Coordenadas em graus decimais (sul e oeste são negativos). A sede de Autazes é aproximada: CONFIRAM no Google Maps (clique com o botão direito no local > copiar coordenadas). Acrescentem as comunidades que apareceram nas entrevistas, no mesmo formato.",
+  "comunidades": [
+    {"nome": "Autazes (sede)", "lat": -3.5797, "lon": -59.1306}
+  ]
+}

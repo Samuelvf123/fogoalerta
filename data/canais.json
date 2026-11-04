@@ -1,0 +1,21 @@
+{
+  "_leia": "Canais oficiais por tipo de relato. CONFIRMEM cada número antes da demo. Os itens com 'conferir' ainda não foram verificados.",
+  "fogo_ativo": [
+    {"orgao": "Corpo de Bombeiros Militar do Amazonas (CBMAM)", "contato": "193", "quando": "Fogo acontecendo agora, principalmente perto de casas, roças ou pessoas"}
+  ],
+  "queimada_ilegal": [
+    {"orgao": "Ipaam (Instituto de Proteção Ambiental do Amazonas)", "contato": "PREENCHER: canal de denúncia do Ipaam (conferir no site oficial)", "quando": "Uso do fogo proibido, sem fogo ativo ameaçando pessoas"},
+    {"orgao": "Ibama - Linha Verde", "contato": "0800 061 8080", "quando": "Também recebe denúncias ambientais"}
+  ],
+  "desmatamento_ou_grilagem": [
+    {"orgao": "Ibama - Linha Verde", "contato": "0800 061 8080", "quando": "Desmatamento ou ocupação irregular, especialmente em área federal"},
+    {"orgao": "Ipaam", "contato": "PREENCHER: canal de denúncia do Ipaam (conferir no site oficial)", "quando": "Área estadual"}
+  ],
+  "fumaca_saude": [
+    {"orgao": "UBS ou emergência do SUS mais próxima", "contato": "Procurar atendimento se houver falta de ar, tosse forte ou mal-estar", "quando": "Sintomas causados pela fumaça"},
+    {"orgao": "Defesa Civil", "contato": "199 (conferir para o município)", "quando": "Situação de risco para a comunidade"}
+  ],
+  "outro": [
+    {"orgao": "Defesa Civil", "contato": "199 (conferir para o município)", "quando": "Dúvida sobre para onde encaminhar"}
+  ]
+}
