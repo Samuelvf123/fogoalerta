@@ -40,6 +40,10 @@ class Foco:
 
     @property
     def id(self) -> str:
+        if self.fonte == "SIMULADO":
+            # No modo demonstração o horário "anda" com o relógio; sem isto, o mesmo foco
+            # simulado viraria "novo" a cada hora e o alerta se repetiria. Um alerta por dia basta.
+            return f"{self.fonte}:{self.lat:.4f}:{self.lon:.4f}:{self.data_hora_local:%Y%m%d}"
         return f"{self.fonte}:{self.lat:.4f}:{self.lon:.4f}:{self.data_hora_utc:%Y%m%d%H%M}"
 
     @property

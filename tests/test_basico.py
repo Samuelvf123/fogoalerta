@@ -361,3 +361,14 @@ def test_preferencia_de_audio(tmp_path):
     assert estado.preferencia(5, "audio", False) is False
     estado.definir_preferencia(5, "audio", True)
     assert Estado(tmp_path / "e.json").preferencia(5, "audio") is True  # persiste em arquivo
+
+
+def test_foco_simulado_nao_repete_alerta_a_cada_hora():
+    from datetime import timedelta
+    f = firms.focos_demo(*AUTAZES)[0]
+    uma_hora_depois = firms.Foco(f.lat, f.lon, f.data_hora_utc.replace(minute=0) + timedelta(minutes=1),
+                                 f.satelite, f.instrumento, f.confianca, f.frp, f.fonte)
+    if uma_hora_depois.data_hora_local.date() == f.data_hora_local.date():
+        assert uma_hora_depois.id == f.id
+    real = firms.Foco(f.lat, f.lon, f.data_hora_utc, "N", "VIIRS", "alta", 1.0, "VIIRS_SNPP_NRT")
+    assert real.id.endswith(f"{f.data_hora_utc:%Y%m%d%H%M}")  # foco real continua com horário exato
