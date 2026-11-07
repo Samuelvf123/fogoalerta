@@ -59,3 +59,6 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | "Tem fogo perto?" disparava a mensagem de emergência (pergunta confundida com socorro) | Regra separa palavras fortes (socorro, incêndio...) de fracas (fogo perto...); fracas não contam em perguntas |
 | IA citou "reflexo do sol" sem estar na base | Base passou a explicar falsos positivos do satélite |
 | IA repetia o 193 logo depois da mensagem fixa de emergência | A IA é avisada de que o aviso fixo já saiu e vai direto ao próximo passo |
+| Envio do áudio demorava e o bot mostrava "Tive um problema", embora o áudio chegasse | Mais tempo para enviar áudio; falha no áudio nunca vira mensagem de erro (o texto já foi entregue) |
+| "Boa tarde" à 00h25 (madrugada era tratada como tarde) | Período do dia corrigido: 18h–4h = noite |
+| Boletim escrevia "cento e noventa e três" e arredondava distâncias (4,3 km → "quatro e meio") | Boletim usa algarismos e distâncias exatas; a voz lê telefones como "um nove três" mesmo se vierem por extenso |

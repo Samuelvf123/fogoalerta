@@ -372,3 +372,8 @@ def test_foco_simulado_nao_repete_alerta_a_cada_hora():
         assert uma_hora_depois.id == f.id
     real = firms.Foco(f.lat, f.lon, f.data_hora_utc, "N", "VIIRS", "alta", 1.0, "VIIRS_SNPP_NRT")
     assert real.id.endswith(f"{f.data_hora_utc:%Y%m%d%H%M}")  # foco real continua com horário exato
+
+
+def test_telefone_por_extenso_vira_digitos_na_fala():
+    f = voz.preparar_texto("Ligue imediatamente para o cento e noventa e três. SAMU: cento e noventa e dois.")
+    assert "um nove três" in f and "um nove dois" in f and "cento" not in f

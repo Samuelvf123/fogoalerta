@@ -14,7 +14,7 @@ from pathlib import Path
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
                       ReplyKeyboardMarkup, ReplyKeyboardRemove, Update)
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest
+from telegram.error import BadRequest, NetworkError
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, MessageHandler, filters)
 
@@ -105,12 +105,20 @@ async def enviar_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, texto
         await context.bot.send_chat_action(update.effective_chat.id, ChatAction.RECORD_VOICE)
         if not await voz.sintetizar(texto, caminho):
             return
+        # Áudio é um extra: nenhuma falha aqui pode virar "Tive um problema" para a pessoa.
         try:
             with open(caminho, "rb") as f:
-                await update.effective_message.reply_voice(f, caption=legenda)
+                await update.effective_message.reply_voice(f, caption=legenda, write_timeout=90, read_timeout=90)
         except BadRequest:
-            with open(caminho, "rb") as f:  # alguns clientes só aceitam como áudio comum
-                await update.effective_message.reply_audio(f, caption=legenda, title="FogoAlerta")
+            try:
+                with open(caminho, "rb") as f:  # alguns clientes só aceitam como áudio comum
+                    await update.effective_message.reply_audio(f, caption=legenda, title="FogoAlerta",
+                                                               write_timeout=90, read_timeout=90)
+            except NetworkError as e:
+                log.warning("Falha ao enviar áudio: %s", e)
+        except NetworkError as e:
+            # Inclui TimedOut: muitas vezes o Telegram entrega o áudio mesmo depois do tempo esgotado.
+            log.warning("Envio do áudio demorou ou falhou (%s); o texto já foi entregue.", e)
 
 
 def quer_audio(chat_id: int) -> bool:

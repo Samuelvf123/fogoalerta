@@ -18,6 +18,9 @@ _EMOJI = re.compile("[\U0001F000-\U0001FAFF☀-➿️‍←-⇿⬀-⯿]")
 _TROCAS = [
     (re.compile(r"```.*?```", re.S), " O texto completo está na mensagem escrita. "),
     (re.compile(r"https?://\S+"), ""),
+    (re.compile(r"cento e noventa e tr[eê]s", re.I), "um nove três"),
+    (re.compile(r"cento e noventa e dois", re.I), "um nove dois"),
+    (re.compile(r"cento e noventa e nove", re.I), "um nove nove"),
     (re.compile(r"\b193\b"), "um nove três"),
     (re.compile(r"\b192\b"), "um nove dois"),
     (re.compile(r"\b199\b"), "um nove nove"),

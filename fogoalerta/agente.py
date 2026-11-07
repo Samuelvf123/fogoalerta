@@ -112,6 +112,15 @@ FERRAMENTAS = [
 ]
 
 
+def periodo_do_dia(hora: int) -> str:
+    """5h-11h manhã, 12h-17h tarde, 18h-4h noite (madrugada conta como noite: 'boa noite')."""
+    if 5 <= hora < 12:
+        return "manhã"
+    if 12 <= hora < 18:
+        return "tarde"
+    return "noite"
+
+
 class Agente:
     def __init__(self, provedor: Any | None = None, estado: Estado | None = None,
                  base: BaseConhecimento | None = None,
@@ -137,7 +146,7 @@ class Agente:
                  if u else "A pessoa ainda NÃO cadastrou a comunidade: peça para usar /comunidade ou enviar a localização.")
         loc = ("A pessoa JÁ enviou a localização do que está vendo (vai no relato)." if chat_id in self.local_relato
                else "A pessoa ainda não enviou a localização do que está vendo.")
-        periodo = "manhã" if 5 <= agora.hour < 12 else "tarde" if agora.hour < 18 else "noite"
+        periodo = periodo_do_dia(agora.hour)
         alerta = ""
         if chat_id in self.ultimo_alerta:
             texto, quando = self.ultimo_alerta[chat_id]
@@ -262,7 +271,8 @@ class Agente:
             "diga logo no início que é uma simulação; focos perto (ou que não houve detecção, lembrando que satélite pode não ver fogo pequeno); "
             "condições do tempo; qualidade do ar (use consultar_ar, só se ela não for Boa dê um cuidado de saúde); "
             "um lembrete de prevenção (busque na base); como pedir ajuda (193). "
-            "Texto corrido, sem emojis, sem listas, frases curtas."
+            "Texto corrido, sem emojis, sem listas, frases curtas. Distâncias exatas, com vírgula "
+            "(4,3 km), sem arredondar. Telefones com algarismos (193), não por extenso."
         )
         return await self.responder(chat_id, pedido, guardar_historico=False)
 

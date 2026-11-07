@@ -343,3 +343,10 @@ async def test_ferramenta_qualidade_do_ar(tmp_path):
     agente.buscar_ar = ar_falso
     await agente.responder(7, "a fumaça tá forte, faz mal?")
     assert prov.resultados[0][0]["qualidade"] == "Ruim"
+
+
+@pytest.mark.parametrize("hora, esperado", [(0, "noite"), (3, "noite"), (5, "manhã"), (11, "manhã"),
+                                             (12, "tarde"), (17, "tarde"), (18, "noite"), (23, "noite")])
+def test_periodo_do_dia(hora, esperado):
+    from fogoalerta.agente import periodo_do_dia
+    assert periodo_do_dia(hora) == esperado
