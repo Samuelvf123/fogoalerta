@@ -31,3 +31,13 @@ def prefixo(data_original: datetime | None, agora: datetime | None = None) -> st
         quando = f"mensagem original de {local:%d/%m às %Hh%M} ({ha_quanto_tempo(local, agora)})"
     return (f"[A pessoa ENCAMINHOU esta mensagem para conferir se é verdade; {quando}. "
             "Compare com os dados oficiais de agora.]\n")
+
+
+def aviso_curto(data_original: datetime | None, agora: datetime | None = None) -> str:
+    """Primeira resposta visível para a pessoa: mostra que o bot reconheceu o encaminhamento."""
+    agora = agora or datetime.now(FUSO)
+    if data_original is None:
+        return "🔎 Conferindo a mensagem encaminhada (data original desconhecida)..."
+    local = data_original.astimezone(FUSO)
+    return (f"🔎 Conferindo a mensagem encaminhada: original de {local:%d/%m às %Hh%M} "
+            f"({ha_quanto_tempo(local, agora)})...")

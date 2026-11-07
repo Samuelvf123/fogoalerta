@@ -377,3 +377,9 @@ def test_foco_simulado_nao_repete_alerta_a_cada_hora():
 def test_telefone_por_extenso_vira_digitos_na_fala():
     f = voz.preparar_texto("Ligue imediatamente para o cento e noventa e três. SAMU: cento e noventa e dois.")
     assert "um nove três" in f and "um nove dois" in f and "cento" not in f
+
+
+def test_aviso_curto_de_encaminhamento():
+    agora = datetime(2026, 11, 7, 10, 0, tzinfo=encaminhada.FUSO)
+    a = encaminhada.aviso_curto(datetime(2026, 11, 5, 13, 0, tzinfo=timezone.utc), agora)
+    assert a.startswith("🔎") and "05/11 às 09h00" in a and "há 2 dias" in a

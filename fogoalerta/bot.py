@@ -129,7 +129,11 @@ async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE
                               imagem: tuple[bytes, str] | None = None, em_audio: bool = False) -> None:
     chat_id = update.effective_chat.id
     # Mensagem encaminhada é checagem de boato, não pedido de socorro: não dispara o aviso fixo.
-    emergencia = detectar_emergencia(texto) and not prefixo_encaminhada(update)
+    origem = getattr(update.effective_message, "forward_origin", None)
+    if origem:
+        log.info("Mensagem encaminhada recebida (original de %s).", origem.date)
+        await update.effective_message.reply_text(encaminhada.aviso_curto(origem.date))
+    emergencia = detectar_emergencia(texto) and not origem
     if emergencia:
         await update.effective_message.reply_text(MENSAGEM_EMERGENCIA)
     await context.bot.send_chat_action(chat_id, ChatAction.TYPING)
