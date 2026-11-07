@@ -112,6 +112,14 @@ FERRAMENTAS = [
 ]
 
 
+def remover_falsa_simulacao(texto: str) -> str:
+    """Rede de segurança do boletim com dados reais: tira frases que digam que é simulação/teste."""
+    import re
+    frases = re.split(r"(?<=[.!?])\s+", texto)
+    boas = [f for f in frases if not re.search(r"simula[çc][ãa]o|simulad[oa]s?|dados de teste|para testes", f, re.I)]
+    return " ".join(boas).strip() if boas else texto
+
+
 def periodo_do_dia(hora: int) -> str:
     """5h-11h manhã, 12h-17h tarde, 18h-4h noite (madrugada conta como noite: 'boa noite')."""
     if 5 <= hora < 12:
@@ -264,17 +272,23 @@ class Agente:
         return resposta_final
 
     async def boletim_radio(self, chat_id: int) -> str:
+        # A instrução sobre simulação só entra no modo demo: deixá-la sempre fazia a IA dizer
+        # "é uma simulação" mesmo com dados reais (achado no teste de 07/11).
+        origem = ("Os dados de focos são SIMULADOS (modo demonstração): diga isso logo no início. "
+                  if CONFIG.modo_demo else
+                  "Os dados de focos são REAIS (satélites da NASA, sistema FIRMS): NÃO diga que é simulação ou teste. ")
         pedido = (
             "Escreva o boletim de rádio de hoje para a comunidade cadastrada, para ser lido em voz alta "
-            "em cerca de 1 minuto. Use consultar_focos (últimas 24 h) e consultar_tempo. Estrutura: "
-            "saudação certa para o período do dia (veja AGORA); se os dados de focos forem simulados, "
-            "diga logo no início que é uma simulação; focos perto (ou que não houve detecção, lembrando que satélite pode não ver fogo pequeno); "
+            "em cerca de 1 minuto. Use consultar_focos (últimas 24 h) e consultar_tempo. " + origem +
+            "Estrutura: saudação certa para o período do dia (veja AGORA); "
+            "focos perto (ou que não houve detecção, lembrando que satélite pode não ver fogo pequeno); "
             "condições do tempo; qualidade do ar (use consultar_ar, só se ela não for Boa dê um cuidado de saúde); "
             "um lembrete de prevenção (busque na base); como pedir ajuda (193). "
             "Texto corrido, sem emojis, sem listas, frases curtas. Distâncias exatas, com vírgula "
             "(4,3 km), sem arredondar. Telefones com algarismos (193), não por extenso."
         )
-        return await self.responder(chat_id, pedido, guardar_historico=False)
+        texto = await self.responder(chat_id, pedido, guardar_historico=False)
+        return remover_falsa_simulacao(texto) if not CONFIG.modo_demo else texto
 
     def limpar_conversa(self, chat_id: int) -> None:
         self.historico.pop(chat_id, None)

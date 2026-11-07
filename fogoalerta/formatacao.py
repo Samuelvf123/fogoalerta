@@ -13,6 +13,7 @@ def _trecho(texto: str) -> str:
     t = re.sub(r"^(\s*)[*\-] ", r"\1• ", t, flags=re.M)          # listas
     t = re.sub(r"^#{1,6}\s*(.+)$", r"<b>\1</b>", t, flags=re.M)  # títulos viram negrito
     t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t, flags=re.S)    # **negrito**
+    t = re.sub(r"(?<![*\w])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![*\w])", r"<i>\1</i>", t)  # *itálico*
     t = re.sub(r"`([^`\n]+)`", r"<code>\1</code>", t)            # `código`
     return t
 
@@ -29,4 +30,5 @@ def para_html(texto: str) -> str:
 def sem_markdown(texto: str) -> str:
     """Versão de reserva em texto puro, se o Telegram recusar o HTML."""
     t = _BLOCO.sub(lambda m: m.group(1).strip(), texto)
-    return t.replace("**", "").replace("`", "")
+    t = t.replace("**", "").replace("`", "")
+    return re.sub(r"(?<![*\w])\*(?!\s)([^*\n]+?)(?<!\s)\*(?![*\w])", r"\1", t)

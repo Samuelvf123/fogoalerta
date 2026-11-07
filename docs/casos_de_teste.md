@@ -63,3 +63,5 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | "Boa tarde" à 00h25 (madrugada era tratada como tarde) | Período do dia corrigido: 18h–4h = noite |
 | Boletim escrevia "cento e noventa e três" e arredondava distâncias (4,3 km → "quatro e meio") | Boletim usa algarismos e distâncias exatas; a voz lê telefones como "um nove três" mesmo se vierem por extenso |
 | Teste de boato com mensagem própria das Mensagens Salvas não era reconhecido como encaminhamento | Não é erro do bot: o Telegram envia como cópia ("Nomes dos autores removidos"). Testar encaminhando um alerta antigo do próprio bot; limite documentado no README |
+| Com dados reais (MODO_DEMO=0), o boletim disse que os focos eram "uma simulação para testes" | Pedido do boletim muda conforme o modo; com dados reais, frases que falem em simulação são removidas do boletim |
+| `*Aviso:*` aparecia com asteriscos (itálico não convertido) | Formatação converte *itálico* sem afetar listas |

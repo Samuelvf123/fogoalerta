@@ -350,3 +350,23 @@ async def test_ferramenta_qualidade_do_ar(tmp_path):
 def test_periodo_do_dia(hora, esperado):
     from fogoalerta.agente import periodo_do_dia
     assert periodo_do_dia(hora) == esperado
+
+
+def test_boletim_real_remove_frase_de_simulacao():
+    from fogoalerta.agente import remover_falsa_simulacao
+    t = ("Boa noite, comunidade de Autazes. Atenção, os dados usados aqui são uma simulação para testes do sistema. "
+         "Nas últimas 24 horas, os satélites não detectaram focos. Em emergência, ligue 193.")
+    r = remover_falsa_simulacao(t)
+    assert "simulação" not in r and r.startswith("Boa noite") and r.endswith("ligue 193.")
+
+
+async def test_pedido_do_boletim_depende_do_modo(tmp_path, monkeypatch):
+    import fogoalerta.agente as ag
+    for demo, esperado in ((False, "REAIS"), (True, "SIMULADOS")):
+        monkeypatch.setattr(ag, "CONFIG", NS(**{**ag.CONFIG.__dict__, "modo_demo": demo}))
+        agente, prov = novo_agente(tmp_path, [texto("Boa noite. Sem focos hoje.")])
+        pedidos = []
+        orig = prov.nova_conversa
+        prov.nova_conversa = lambda h, t, i: pedidos.append(t) or orig(h, t, i)
+        await agente.boletim_radio(7)
+        assert esperado in pedidos[0]

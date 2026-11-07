@@ -383,3 +383,9 @@ def test_aviso_curto_de_encaminhamento():
     agora = datetime(2026, 11, 7, 10, 0, tzinfo=encaminhada.FUSO)
     a = encaminhada.aviso_curto(datetime(2026, 11, 5, 13, 0, tzinfo=timezone.utc), agora)
     assert a.startswith("🔎") and "05/11 às 09h00" in a and "há 2 dias" in a
+
+
+def test_italico_vira_html_sem_quebrar_lista():
+    h = para_html("*Aviso:* o vento pode mudar.\n* item da lista\nconta 2*3*4")
+    assert "<i>Aviso:</i>" in h and "• item da lista" in h and "2*3*4" in h
+    assert sem_markdown("*Aviso:* ok") == "Aviso: ok"
