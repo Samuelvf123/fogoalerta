@@ -62,3 +62,4 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | Envio do áudio demorava e o bot mostrava "Tive um problema", embora o áudio chegasse | Mais tempo para enviar áudio; falha no áudio nunca vira mensagem de erro (o texto já foi entregue) |
 | "Boa tarde" à 00h25 (madrugada era tratada como tarde) | Período do dia corrigido: 18h–4h = noite |
 | Boletim escrevia "cento e noventa e três" e arredondava distâncias (4,3 km → "quatro e meio") | Boletim usa algarismos e distâncias exatas; a voz lê telefones como "um nove três" mesmo se vierem por extenso |
+| Teste de boato com mensagem própria das Mensagens Salvas não era reconhecido como encaminhamento | Não é erro do bot: o Telegram envia como cópia ("Nomes dos autores removidos"). Testar encaminhando um alerta antigo do próprio bot; limite documentado no README |

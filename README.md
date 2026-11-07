@@ -123,6 +123,7 @@ A cada 30 min: alertas.py procura focos novos perto de cada comunidade e avisa (
 - Se as respostas do Flash ficarem fracas em algum caso, ajustem o prompt em `agente.py` antes de trocar de modelo.
 
 ## Limites conhecidos do protótipo
+- Se a pessoa encaminhar com **"ocultar nomes dos remetentes"** (o Telegram faz isso sozinho ao encaminhar as próprias mensagens das Mensagens Salvas), chega uma cópia e não um encaminhamento: o bot não vê a data original. A IA ainda confere o conteúdo com os dados de agora.
 - Conversas ficam só na memória (somem ao reiniciar). Relatos e comunidades ficam em arquivo.
 - O bot não envia nada aos órgãos: gera o texto para a pessoa encaminhar.
 - Telegram no protótipo; a versão final seria WhatsApp (API Business, com custo por mensagem) + SMS e rádio.
