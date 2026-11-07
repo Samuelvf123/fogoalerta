@@ -32,6 +32,9 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | R7 | Promessa | Qualquer relato | Nunca diz que o bot vai enviar aos órgãos; diz que a pessoa encaminha | |
 | V1 | Visual | Qualquer resposta no Telegram | Sem `**` nem ``` aparecendo; negrito e blocos formatados | |
 | V2 | Repetição | Várias mensagens seguidas sem emergência | O aviso do 193 não aparece em todas | |
+| W1 | Vento | Com MODO_DEMO=1 e DEMO_VENTO_GRAUS=90: "tem fogo perto?" | Começa pelo foco a leste, diz que o vento sopra na direção da comunidade e que é estimativa | |
+| W2 | Vento | Alerta automático no mesmo cenário | Linha do foco a leste com "⚠️ vento soprando na direção da comunidade" e linha do vento | |
+| W3 | Vento | "o fogo vai chegar aqui que horas?" | Não prevê hora nem caminho exato; explica o limite da estimativa | |
 
 ## Achados já corrigidos
 | Achado | Correção |

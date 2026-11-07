@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from typing import Awaitable, Callable
 
-from . import firms
+from . import clima, firms, propagacao
 from .armazenamento import Estado
 from .config import CONFIG
 from .guardrails import AVISO_FOCO
@@ -16,14 +16,18 @@ from .guardrails import AVISO_FOCO
 log = logging.getLogger(__name__)
 
 
-def montar_mensagem(comunidade: str, novos: list[dict]) -> str:
-    perto = novos[0]
-    linhas = [
-        f"🔥 ALERTA FogoAlerta: {len(novos)} foco(s) de calor novo(s) perto de {comunidade}.",
-        f"O mais próximo: {perto['distancia_km']} km a {perto['direcao']}, detectado em {perto['detectado_em']}.",
-    ]
-    for f in novos[1:3]:
-        linhas.append(f"• {f['distancia_km']} km a {f['direcao']} ({f['detectado_em']})")
+def _linha(f: dict) -> str:
+    alerta_vento = " ⚠️ vento soprando na direção da comunidade" if f.get("vento", {}).get("situacao") == "a_favor" else ""
+    km = str(f["distancia_km"]).replace(".", ",")  # padrão brasileiro: 8,1 km
+    return f"• {km} km a {f['direcao']} ({f['detectado_em']}){alerta_vento}"
+
+
+def montar_mensagem(comunidade: str, novos: list[dict], vento: dict | None = None) -> str:
+    linhas = [f"🔥 ALERTA FogoAlerta: {len(novos)} foco(s) de calor novo(s) perto de {comunidade}."]
+    linhas += [_linha(f) for f in novos[:3]]
+    if vento:
+        linhas.append(f"Agora: {propagacao.descrever_vento(vento)}{' (simulado)' if vento.get('simulado') else ''}. "
+                      "Estimativa simples: o vento pode mudar, principalmente à noite.")
     linhas += [
         "",
         "Se vir fogo ou fumaça perto de casas ou pessoas, ligue 193.",
@@ -39,7 +43,8 @@ def montar_mensagem(comunidade: str, novos: list[dict]) -> str:
 
 
 async def verificar(estado: Estado, enviar: Callable[[int, str], Awaitable[None]],
-                    buscar_focos: Callable[..., Awaitable[list[dict]]] = firms.focos_proximos) -> int:
+                    buscar_focos: Callable[..., Awaitable[list[dict]]] = firms.focos_proximos,
+                    buscar_tempo: Callable[..., Awaitable[dict]] = clima.condicoes) -> int:
     """Envia alertas de focos ainda não avisados. Devolve quantas mensagens foram enviadas."""
     enviados = 0
     for chat_id, u in estado.usuarios_com_alerta().items():
@@ -51,8 +56,14 @@ async def verificar(estado: Estado, enviar: Callable[[int, str], Awaitable[None]
         novos = [f for f in focos if not estado.ja_alertado(chat_id, f["id"])]
         if not novos:
             continue
+        vento = None
         try:
-            await enviar(int(chat_id), montar_mensagem(u["comunidade"], novos))
+            vento = (await buscar_tempo(u["lat"], u["lon"])).get("vento_agora")
+        except Exception:  # noqa: BLE001 - sem vento, o alerta sai do mesmo jeito
+            log.warning("Sem dado de vento para %s", chat_id)
+        novos = propagacao.anotar(novos, u["lat"], u["lon"], vento)
+        try:
+            await enviar(int(chat_id), montar_mensagem(u["comunidade"], novos, vento))
         except Exception:  # noqa: BLE001
             log.exception("Falha ao enviar alerta para %s", chat_id)
             continue

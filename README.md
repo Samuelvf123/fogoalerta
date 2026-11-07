@@ -42,7 +42,7 @@ Copie `.env.example` para `.env` e cole as chaves. **Nunca suba o `.env` para o 
 
 ### 4. Testar por partes (do mais simples ao completo)
 ```bash
-python -m pytest                    # 46 testes, sem internet e sem gastar cota
+python -m pytest                    # 68 testes, sem internet e sem gastar cota
 python scripts/testar_firms.py      # focos reais perto de Autazes + tempo (só precisa da FIRMS_MAP_KEY)
 python scripts/conversar.py         # conversa com o agente pelo terminal (precisa da GEMINI_API_KEY)
 python -m fogoalerta.bot            # o bot no Telegram
@@ -53,6 +53,8 @@ No Telegram, abra o seu bot, mande `/start` e depois `/comunidade`.
 Se não houver foco real perto de Autazes na hora da demo, coloque `MODO_DEMO=1` no `.env`.
 O bot passa a usar focos **simulados** (`data/demo_focos.csv`), e todas as mensagens avisam que é simulação.
 Na apresentação, digam isso abertamente: mostra honestidade e a banca entende.
+
+Para mostrar a **análise de vento** no vídeo, use também `DEMO_VENTO_GRAUS=90` (vento vindo do leste): o foco simulado a leste aparece com "⚠️ vento soprando na direção da comunidade".
 
 ---
 
@@ -84,7 +86,8 @@ A cada 30 min: alertas.py procura focos novos perto de cada comunidade e avisa (
 | `fogoalerta/llm.py` | Provedores de IA: Gemini (padrão) e Claude |
 | `fogoalerta/guardrails.py` | Regras que não dependem da IA |
 | `fogoalerta/firms.py` | Focos de calor (NASA FIRMS) e modo demonstração |
-| `fogoalerta/clima.py` | Tempo e risco estimado (não é índice oficial) |
+| `fogoalerta/clima.py` | Tempo, vento e risco estimado (não é índice oficial) |
+| `fogoalerta/propagacao.py` | Vento x foco: o vento leva o fogo para a comunidade? (estimativa simples) |
 | `fogoalerta/conhecimento.py` | Busca na base de orientações |
 | `fogoalerta/relatos.py` | Registro de relatos e canais |
 | `fogoalerta/alertas.py` | Alerta automático |

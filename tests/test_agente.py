@@ -40,12 +40,15 @@ def ferramenta(nome, args, id_="t1"):
 
 
 async def focos_falsos(lat, lon, raio, dias):
+    # foco a sudeste da comunidade (-3.58, -59.13)
     return [{"id": "x", "distancia_km": 4.2, "direcao": "sudeste", "detectado_em": "04/11 às 01h42",
+             "lat": -3.61, "lon": -59.10,
              "confianca": "alta", "intensidade_frp_mw": 7.1, "satelite": "VIIRS N"}]
 
 
 async def tempo_falso(lat, lon):
-    return {"temperatura_max_hoje_c": 37, "nivel_risco_estimado": "alto"}
+    # vento vindo do sudeste (135°): sopra do foco em direção à comunidade
+    return {"temperatura_max_hoje_c": 37, "nivel_risco_estimado": "alto", "vento_agora": {"de_graus": 135, "kmh": 15}}
 
 
 def novo_agente(tmp_path, roteiro, com_local=True):
@@ -64,7 +67,10 @@ async def test_usa_ferramenta_de_focos_e_poe_aviso(tmp_path):
     ])
     r = await agente.responder(7, "tem fogo perto?")
     assert "4,2 km" in r and AVISO_FOCO in r  # guardrail acrescentou o aviso
-    assert prov.resultados[0][0]["focos"][0]["direcao"] == "sudeste"
+    resultado = prov.resultados[0][0]
+    assert resultado["focos"][0]["direcao"] == "sudeste"
+    assert resultado["focos"][0]["vento"]["situacao"] == "a_favor"   # análise de propagação
+    assert "sudeste" in resultado["vento_agora"] and "estimativa simples" in resultado["aviso_vento"].lower()
     assert "Autazes" in prov.ultimo_sistema  # contexto da comunidade vai no prompt
 
 
@@ -306,3 +312,15 @@ async def test_ia_sabe_do_ultimo_alerta(tmp_path):
     await agente.responder(7, "o que eu faço?")
     assert "ÚLTIMO ALERTA AUTOMÁTICO" in prov.ultimo_sistema and "3 focos" in prov.ultimo_sistema
     assert "período da" in prov.ultimo_sistema
+
+
+
+async def test_focos_sem_vento_continuam_funcionando(tmp_path):
+    async def tempo_quebrado(*_):
+        raise TimeoutError("Open-Meteo fora do ar")
+
+    agente, prov = novo_agente(tmp_path, [ferramenta("consultar_focos", {}), texto("1 foco a 4,2 km.")])
+    agente.buscar_tempo = tempo_quebrado
+    await agente.responder(7, "tem foco?")
+    r = prov.resultados[0][0]
+    assert r["total"] == 1 and r["focos"][0]["vento"]["situacao"] == "sem_dado"

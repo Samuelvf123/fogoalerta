@@ -46,6 +46,8 @@ class Config:
     # Modo demonstração: usa focos SIMULADOS (data/demo_focos.csv) perto de Autazes, com a data de hoje.
     # Serve para gravar o vídeo e apresentar quando não houver focos reais. As respostas avisam que é simulação.
     modo_demo: bool = os.getenv("MODO_DEMO", "0") == "1"
+    # Só no modo demonstração: força a direção de onde o vento vem (graus: 90 = do leste), para o vídeo.
+    demo_vento_graus: float | None = (float(os.getenv("DEMO_VENTO_GRAUS")) if os.getenv("DEMO_VENTO_GRAUS") else None)
 
 
 CONFIG = Config()

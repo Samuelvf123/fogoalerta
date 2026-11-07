@@ -16,14 +16,23 @@ def distancia_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * RAIO_TERRA_KM * math.asin(math.sqrt(a))
 
 
-def direcao(lat_origem: float, lon_origem: float, lat_destino: float, lon_destino: float) -> str:
-    """Direção aproximada (norte, sudeste...) de quem está na origem olhando para o destino."""
+def rumo_graus(lat_origem: float, lon_origem: float, lat_destino: float, lon_destino: float) -> float:
+    """Rumo em graus (0 = norte, 90 = leste, 180 = sul, 270 = oeste) da origem até o destino."""
     p1, p2 = math.radians(lat_origem), math.radians(lat_destino)
     dl = math.radians(lon_destino - lon_origem)
     x = math.sin(dl) * math.cos(p2)
     y = math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dl)
-    graus = (math.degrees(math.atan2(x, y)) + 360) % 360
-    return _DIRECOES[int((graus + 22.5) // 45) % 8]
+    return (math.degrees(math.atan2(x, y)) + 360) % 360
+
+
+def cardinal(graus: float) -> str:
+    """Graus -> norte, nordeste, leste..."""
+    return _DIRECOES[int((graus % 360 + 22.5) // 45) % 8]
+
+
+def direcao(lat_origem: float, lon_origem: float, lat_destino: float, lon_destino: float) -> str:
+    """Direção aproximada (norte, sudeste...) de quem está na origem olhando para o destino."""
+    return cardinal(rumo_graus(lat_origem, lon_origem, lat_destino, lon_destino))
 
 
 def caixa_ao_redor(lat: float, lon: float, raio_km: float) -> tuple[float, float, float, float]:

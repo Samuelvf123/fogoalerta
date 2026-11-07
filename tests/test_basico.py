@@ -181,12 +181,18 @@ async def test_alerta_envia_uma_vez(tmp_path):
     async def enviar(chat_id, texto):
         enviados.append((chat_id, texto))
 
-    assert await alertas.verificar(estado, enviar, buscar) == 1
+    async def tempo(*_):
+        return {"vento_agora": {"de_graus": 135, "kmh": 15}}  # vem do sudeste, onde está o foco
+
+    assert await alertas.verificar(estado, enviar, buscar, tempo) == 1
     assert "193" in enviados[0][1] and "satélite" in enviados[0][1]
-    assert await alertas.verificar(estado, enviar, buscar) == 0  # mesmo foco não repete
+    assert "⚠️ vento soprando na direção da comunidade" in enviados[0][1]
+    assert "vento vindo do sudeste para o noroeste" in enviados[0][1]
+    assert "." not in enviados[0][1].split("\n")[1].split(" km")[0]  # distância com vírgula
+    assert await alertas.verificar(estado, enviar, buscar, tempo) == 0  # mesmo foco não repete
     estado.ativar_alertas(42, False)
     estado.dados["alertados"] = {}
-    assert await alertas.verificar(estado, enviar, buscar) == 0  # alertas desligados
+    assert await alertas.verificar(estado, enviar, buscar, tempo) == 0  # alertas desligados
 
 
 # ---------------------------------------------------------------- modo demonstração
@@ -239,3 +245,48 @@ def test_tempo_em_portugues_com_virgula():
     r = clima.resumir(dados)["resumo_em_portugues"]
     assert "1,5 mm de chuva nos próximos 3 dias" in r and "máxima de 32 graus" in r
     assert "1.5" not in r
+
+
+
+# ---------------------------------------------------------------- propagação pelo vento
+from fogoalerta import propagacao  # noqa: E402
+
+
+@pytest.mark.parametrize("vento_de, foco, esperado", [
+    (90, (0.0, 0.05), "a_favor"),     # vento vem do leste; foco a leste -> vento traz o fogo
+    (90, (0.0, -0.05), "contra"),     # foco a oeste -> vento leva para longe
+    (90, (0.05, 0.0), "de_lado"),     # foco ao norte -> vento de lado
+    (45, (0.04, 0.04), "a_favor"),    # vento do nordeste; foco a nordeste
+])
+def test_avaliar_vento(vento_de, foco, esperado):
+    r = propagacao.avaliar(0.0, 0.0, foco[0], foco[1], {"de_graus": vento_de, "kmh": 15})
+    assert r["situacao"] == esperado
+
+
+def test_vento_fraco_e_sem_dado():
+    assert propagacao.avaliar(0, 0, 0, 0.05, {"de_graus": 90, "kmh": 2})["situacao"] == "vento_fraco"
+    assert propagacao.avaliar(0, 0, 0, 0.05, None)["situacao"] == "sem_dado"
+
+
+def test_anotar_prioriza_foco_com_vento_a_favor():
+    focos = [
+        {"id": "perto_contra", "lat": 0.0, "lon": -0.02, "distancia_km": 2.2},
+        {"id": "longe_a_favor", "lat": 0.0, "lon": 0.07, "distancia_km": 7.8},
+    ]
+    r = propagacao.anotar(focos, 0.0, 0.0, {"de_graus": 90, "kmh": 15})
+    assert [f["id"] for f in r] == ["longe_a_favor", "perto_contra"]
+
+
+def test_tempo_traz_vento_atual():
+    dados = {"daily": {
+        "time": [f"d{i}" for i in range(18)],
+        "precipitation_sum": [0.0] * 18,
+        "temperature_2m_max": [33.0] * 18,
+        "wind_speed_10m_max": [10.0] * 18,
+        "wind_direction_10m_dominant": [80] * 18,
+    }, "current": {"wind_speed_10m": 14.0, "wind_direction_10m": 95}, "_indice_hoje": 14}
+    r = clima.resumir(dados)
+    assert r["vento_agora"] == {"de_graus": 95, "kmh": 14.0}
+    assert "vento vindo do leste para o oeste" in r["resumo_em_portugues"]
+    del dados["current"]  # sem "current": usa a direção predominante do dia
+    assert clima.resumir(dados)["vento_agora"] == {"de_graus": 80, "kmh": 10.0}

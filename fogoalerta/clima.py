@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import httpx
 
+from .config import CONFIG
+from .propagacao import descrever_vento
+
 URL = "https://api.open-meteo.com/v1/forecast"
 
 
@@ -14,6 +17,21 @@ def _br(valor: float, casas: int = 1) -> str:
     """Número no formato brasileiro: 1.5 -> '1,5'; 32.0 -> '32'."""
     texto = f"{valor:.{casas}f}".replace(".", ",")
     return texto[:-2] if texto.endswith(",0") else texto
+
+
+def _vento_agora(dados: dict, hoje: int) -> dict | None:
+    """Vento de agora (bloco "current"); se faltar, usa a direção predominante do dia."""
+    atual = dados.get("current") or {}
+    graus, kmh = atual.get("wind_direction_10m"), atual.get("wind_speed_10m")
+    if graus is None:
+        diario = dados["daily"]
+        graus = (diario.get("wind_direction_10m_dominant") or [None] * (hoje + 1))[hoje]
+        kmh = diario["wind_speed_10m_max"][hoje]
+    if CONFIG.modo_demo and CONFIG.demo_vento_graus is not None:
+        return {"de_graus": CONFIG.demo_vento_graus, "kmh": max(kmh or 0, 12), "simulado": True}
+    if graus is None:
+        return None
+    return {"de_graus": graus, "kmh": kmh}
 
 
 def resumir(dados: dict) -> dict:
@@ -38,13 +56,16 @@ def resumir(dados: dict) -> dict:
     nivel = "alto" if pontos >= 4 else "moderado" if pontos >= 2 else "baixo"
 
     prevista = round(sum(chuva[hoje + 1: hoje + 4]), 1)
+    vento_agora = _vento_agora(dados, hoje)
     return {
+        "vento_agora": vento_agora,
         # Frase pronta em português, com vírgula decimal: evita a IA ler "1.5" como "mil e quinhentos".
         "resumo_em_portugues": (
             f"Hoje: máxima de {_br(tmax[hoje], 0)} graus, vento de até {_br(vento[hoje], 0)} km/h, "
             f"{_br(chuva[hoje])} mm de chuva. {dias_sem_chuva} dia(s) seguido(s) sem chuva. "
             f"Previsão de {_br(prevista)} mm de chuva nos próximos 3 dias. "
-            f"Risco estimado de o fogo se espalhar: {nivel}."
+            f"Risco estimado de o fogo se espalhar: {nivel}. "
+            f"Agora: {descrever_vento(vento_agora)}."
         ),
         "data_hoje": datas[hoje],
         "temperatura_max_hoje_c": tmax[hoje],
@@ -62,7 +83,8 @@ async def condicoes(lat: float, lon: float, cliente: httpx.AsyncClient | None = 
     params = {
         "latitude": lat,
         "longitude": lon,
-        "daily": "temperature_2m_max,precipitation_sum,wind_speed_10m_max",
+        "daily": "temperature_2m_max,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant",
+        "current": "wind_speed_10m,wind_direction_10m",
         "past_days": 14,
         "forecast_days": 4,
         "timezone": "America/Manaus",
