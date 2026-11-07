@@ -18,7 +18,7 @@ from telegram.error import BadRequest
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, MessageHandler, filters)
 
-from . import VERSAO, alertas, audio
+from . import VERSAO, alertas, audio, encaminhada, voz
 from .agente import Agente
 from .armazenamento import Estado
 from .config import CONFIG
@@ -52,9 +52,12 @@ AJUDA = (
     "/comunidade - escolher a comunidade\n"
     "/focos - ver focos de calor perto\n"
     "/tempo - calor, vento e chuva\n"
+    "/ar - fumaça e qualidade do ar\n"
+    "/checar - conferir um aviso que você recebeu\n"
     "/boletim - texto para ler na rádio\n"
     "/relato - registrar o que você viu\n"
     "/alertas_on ou /alertas_off - ligar ou desligar avisos\n"
+    "/audio_on ou /audio_off - respostas também em áudio\n"
     "/privacidade - o que eu guardo\n"
     "/limpar - começar a conversa de novo\n\n"
     "Você também pode escrever, mandar áudio ou foto."
@@ -66,7 +69,8 @@ PRIVACIDADE = (
     "• os relatos que você pedir para registrar, anônimos por padrão;\n"
     "• as fotos enviadas para um relato.\n\n"
     "Não guardo seu nome nem seu telefone, a não ser que você peça para se identificar num relato. "
-    "As conversas ficam só na memória e somem quando o bot reinicia.\n\n"
+    "As conversas ficam só na memória e somem quando o bot reinicia.\n"
+    "Para gerar respostas em áudio, o texto da resposta passa por um serviço de voz na internet.\n\n"
     "Atenção: este protótipo usa um serviço de IA de terceiros. Não mande dados pessoais "
     "(CPF, documentos, endereço completo) nas mensagens."
 )
@@ -87,17 +91,47 @@ async def enviar_texto(update: Update, texto: str) -> None:
         await msg.reply_text(puro[i:i + 4000], disable_web_page_preview=True)
 
 
+def prefixo_encaminhada(update: Update) -> str:
+    """Se a mensagem foi encaminhada, devolve o aviso com a data original (para checar boatos)."""
+    origem = getattr(update.effective_message, "forward_origin", None)
+    return encaminhada.prefixo(origem.date) if origem else ""
+
+
+async def enviar_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str,
+                       legenda: str | None = None) -> None:
+    """Manda a resposta também em voz. Se falhar, a pessoa já tem o texto: só registra no log."""
+    with tempfile.TemporaryDirectory() as tmp:
+        caminho = str(Path(tmp) / "resposta.mp3")
+        await context.bot.send_chat_action(update.effective_chat.id, ChatAction.RECORD_VOICE)
+        if not await voz.sintetizar(texto, caminho):
+            return
+        try:
+            with open(caminho, "rb") as f:
+                await update.effective_message.reply_voice(f, caption=legenda)
+        except BadRequest:
+            with open(caminho, "rb") as f:  # alguns clientes só aceitam como áudio comum
+                await update.effective_message.reply_audio(f, caption=legenda, title="FogoAlerta")
+
+
+def quer_audio(chat_id: int) -> bool:
+    return bool(estado.preferencia(chat_id, "audio", False))
+
+
 async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str,
-                              imagem: tuple[bytes, str] | None = None) -> None:
+                              imagem: tuple[bytes, str] | None = None, em_audio: bool = False) -> None:
     chat_id = update.effective_chat.id
-    if detectar_emergencia(texto):
+    # Mensagem encaminhada é checagem de boato, não pedido de socorro: não dispara o aviso fixo.
+    emergencia = detectar_emergencia(texto) and not prefixo_encaminhada(update)
+    if emergencia:
         await update.effective_message.reply_text(MENSAGEM_EMERGENCIA)
     await context.bot.send_chat_action(chat_id, ChatAction.TYPING)
     try:
-        resposta = await agente.responder(chat_id, texto, imagem=imagem)
+        resposta = await agente.responder(chat_id, texto, imagem=imagem, emergencia_avisada=emergencia)
     except ErroLLM as e:
         resposta = mensagem_erro_ia(e)
     await enviar_texto(update, resposta)
+    if em_audio or quer_audio(chat_id):
+        await enviar_audio(update, context, resposta)
 
 
 def mensagem_erro_ia(e: ErroLLM) -> str:
@@ -173,6 +207,18 @@ async def cmd_tempo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await perguntar_ao_agente(update, context, "Como está o tempo hoje aqui? O fogo se espalha fácil?")
 
 
+async def cmd_checar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.message.reply_text(
+        "Recebeu um áudio ou mensagem dizendo que tem fogo ou fumaça perto? Encaminhe aqui "
+        "(segure a mensagem → Encaminhar → escolha o FogoAlerta). Eu comparo com os dados de satélite "
+        "e do tempo de agora e digo de quando é a mensagem original."
+    )
+
+
+async def cmd_ar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await perguntar_ao_agente(update, context, "Como está o ar hoje aqui? A fumaça faz mal? Que cuidados tomar?")
+
+
 async def cmd_relato(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     teclado = ReplyKeyboardMarkup(
         [[KeyboardButton("📍 Enviar onde estou vendo", request_location=True)]],
@@ -193,10 +239,25 @@ async def cmd_boletim(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
     try:
-        texto = "📻 Boletim para a rádio:\n\n" + await agente.boletim_radio(update.effective_chat.id)
+        boletim = await agente.boletim_radio(update.effective_chat.id)
     except ErroLLM as e:
-        texto = mensagem_erro_ia(e)
-    await enviar_texto(update, texto)
+        await enviar_texto(update, mensagem_erro_ia(e))
+        return
+    await enviar_texto(update, "📻 Boletim para a rádio:\n\n" + boletim)
+    # Versão em áudio: a rádio comunitária pode tocar direto.
+    await enviar_audio(update, context, boletim, legenda="📻 Boletim em áudio (voz gerada por computador)")
+
+
+async def cmd_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    ligar = update.message.text.startswith("/audio_on")
+    if ligar and not voz.disponivel():
+        await update.message.reply_text("A resposta em áudio não está instalada neste computador (pip install edge-tts).")
+        return
+    estado.definir_preferencia(update.effective_chat.id, "audio", ligar)
+    await update.message.reply_text(
+        "🔊 Pronto! Vou responder também em áudio." if ligar
+        else "Áudio desligado. Vou responder só por escrito (se você mandar áudio, respondo em áudio)."
+    )
 
 
 async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -222,7 +283,7 @@ async def cmd_limpar(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
 
 # ------------------------------------------------------------------ mensagens
 async def receber_texto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    texto = update.message.text
+    texto = prefixo_encaminhada(update) + update.message.text
     citada = update.message.reply_to_message
     # Se a pessoa "respondeu" a uma mensagem do bot, a IA recebe o trecho citado junto.
     if citada and citada.from_user and citada.from_user.is_bot and citada.text:
@@ -238,7 +299,10 @@ async def receber_foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     caminho = PASTA_FOTOS / f"{datetime.now():%Y%m%d_%H%M%S}_{foto.file_unique_id}.jpg"
     await arquivo.download_to_drive(caminho)
     agente.fotos_pendentes.setdefault(chat_id, []).append(str(caminho))
-    legenda = update.message.caption or "Enviei esta foto. O que dá para ver? Quero registrar um relato."
+    if prefixo_encaminhada(update):
+        legenda = prefixo_encaminhada(update) + (update.message.caption or "Recebi esta imagem. Ela mostra algo perto daqui?")
+    else:
+        legenda = update.message.caption or "Enviei esta foto. O que dá para ver? Quero registrar um relato."
     await perguntar_ao_agente(update, context, legenda, imagem=(caminho.read_bytes(), "image/jpeg"))
 
 
@@ -257,7 +321,8 @@ async def receber_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         await update.message.reply_text("Não entendi o áudio. Pode repetir ou escrever?")
         return
     await update.message.reply_text(f"🎙️ Entendi: \"{texto}\"")
-    await perguntar_ao_agente(update, context, texto)
+    # Quem fala em áudio recebe a resposta em áudio também.
+    await perguntar_ao_agente(update, context, prefixo_encaminhada(update) + texto, em_audio=True)
 
 
 # ------------------------------------------------------------------ alertas
@@ -295,9 +360,12 @@ def main() -> None:
     app.add_handler(CommandHandler("comunidade", cmd_comunidade))
     app.add_handler(CommandHandler("focos", cmd_focos))
     app.add_handler(CommandHandler("tempo", cmd_tempo))
+    app.add_handler(CommandHandler("ar", cmd_ar))
+    app.add_handler(CommandHandler("checar", cmd_checar))
     app.add_handler(CommandHandler("relato", cmd_relato))
     app.add_handler(CommandHandler("boletim", cmd_boletim))
     app.add_handler(CommandHandler(["alertas_on", "alertas_off"], cmd_alertas))
+    app.add_handler(CommandHandler(["audio_on", "audio_off"], cmd_audio))
     app.add_handler(CommandHandler("limpar", cmd_limpar))
     app.add_handler(CommandHandler("versao", cmd_versao))
     app.add_handler(CallbackQueryHandler(escolher_comunidade, pattern=r"^com:\d+$"))
@@ -314,7 +382,9 @@ def main() -> None:
     else:
         log.warning("FIRMS_MAP_KEY ausente: alertas automáticos desligados.")
     if not audio.disponivel():
-        log.info("faster-whisper não instalado: áudio desligado (opcional).")
+        log.info("faster-whisper não instalado: o bot não entende áudio recebido (opcional).")
+    if not voz.disponivel():
+        log.info("edge-tts não instalado: respostas só em texto (pip install edge-tts).")
 
     log.info("FogoAlerta versão %s rodando com %s (%s). Modo demo: %s. Ctrl+C para parar.",
              VERSAO, agente.provedor.nome, agente.provedor.modelo, "LIGADO" if CONFIG.modo_demo else "desligado")

@@ -17,7 +17,7 @@ DIAS_GUARDAR_ALERTAS = 5
 class Estado:
     def __init__(self, caminho: Path | None = None):
         self.caminho = caminho or CONFIG.pasta_dados / "estado.json"
-        self.dados = {"usuarios": {}, "alertados": {}}
+        self.dados = {"usuarios": {}, "alertados": {}, "preferencias": {}}
         if self.caminho.exists():
             self.dados.update(json.loads(self.caminho.read_text(encoding="utf-8")))
 
@@ -41,6 +41,13 @@ class Estado:
 
     def usuario(self, chat_id: int) -> dict | None:
         return self.dados["usuarios"].get(str(chat_id))
+
+    def preferencia(self, chat_id: int, chave: str, padrao=None):
+        return self.dados.setdefault("preferencias", {}).get(str(chat_id), {}).get(chave, padrao)
+
+    def definir_preferencia(self, chat_id: int, chave: str, valor) -> None:
+        self.dados.setdefault("preferencias", {}).setdefault(str(chat_id), {})[chave] = valor
+        self.salvar()
 
     def ativar_alertas(self, chat_id: int, ativo: bool) -> None:
         u = self.usuario(chat_id)

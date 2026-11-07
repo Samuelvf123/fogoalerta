@@ -42,7 +42,7 @@ Copie `.env.example` para `.env` e cole as chaves. **Nunca suba o `.env` para o 
 
 ### 4. Testar por partes (do mais simples ao completo)
 ```bash
-python -m pytest                    # 68 testes, sem internet e sem gastar cota
+python -m pytest                    # 83 testes, sem internet e sem gastar cota
 python scripts/testar_firms.py      # focos reais perto de Autazes + tempo (só precisa da FIRMS_MAP_KEY)
 python scripts/conversar.py         # conversa com o agente pelo terminal (precisa da GEMINI_API_KEY)
 python -m fogoalerta.bot            # o bot no Telegram
@@ -59,9 +59,20 @@ Para mostrar a **análise de vento** no vídeo, use também `DEMO_VENTO_GRAUS=90
 ---
 
 ## Comandos do bot
-`/start` `/comunidade` `/focos` `/tempo` `/boletim` (texto para rádio) `/relato` `/alertas_on` `/alertas_off` `/privacidade` `/limpar` `/ajuda`.
-Também aceita texto livre, foto (a IA descreve a imagem para o relato) e localização.
-Áudio é opcional: `pip install faster-whisper` (transcreve no próprio computador, sem custo; baixa ~500 MB na primeira vez).
+`/start` `/comunidade` `/focos` `/tempo` `/ar` (fumaça e qualidade do ar) `/boletim` (texto + áudio para rádio) `/relato`
+`/checar` (conferir um aviso recebido) `/alertas_on` `/alertas_off` `/audio_on` `/audio_off` `/privacidade` `/versao` `/limpar` `/ajuda`.
+
+- **Texto livre, foto e localização:** a IA descreve a foto para o relato; a localização enviada vai no relato.
+- **Mensagem encaminhada:** encaminhe ao bot um áudio ou texto que está circulando ("vai ter incêndio aí"). Ele mostra
+  **de quando é a mensagem original** e compara com os dados de satélite e do ar de agora, sem chamar de "mentira".
+- **Qualidade do ar:** PM2,5 médio de 24 h (Open-Meteo, modelo Copernicus/CAMS) classificado pelo **IQAr**
+  (Resolução Conama 506/2024): Boa, Moderada, Ruim, Muito ruim, Péssima. É estimativa regional por modelo.
+- **Vento x foco:** cada foco vem com a avaliação "vento a favor / de lado / contra" da comunidade (estimativa simples).
+- **Respostas em áudio:** com `edge-tts` (já está no requirements), o bot responde em voz quando a pessoa manda áudio,
+  ou sempre, com `/audio_on`. O `/boletim` sai também em áudio, pronto para a rádio tocar. Precisa de internet
+  (o texto passa pelo serviço de voz da Microsoft).
+- **Entender áudio recebido** é opcional: `pip install faster-whisper` (transcreve no próprio computador; baixa ~500 MB
+  na primeira vez).
 
 ---
 
@@ -87,6 +98,9 @@ A cada 30 min: alertas.py procura focos novos perto de cada comunidade e avisa (
 | `fogoalerta/guardrails.py` | Regras que não dependem da IA |
 | `fogoalerta/firms.py` | Focos de calor (NASA FIRMS) e modo demonstração |
 | `fogoalerta/clima.py` | Tempo, vento e risco estimado (não é índice oficial) |
+| `fogoalerta/ar.py` | Qualidade do ar (PM2,5) e classificação IQAr |
+| `fogoalerta/encaminhada.py` | Checagem de mensagens encaminhadas (data original) |
+| `fogoalerta/voz.py` | Respostas em áudio (texto -> voz) |
 | `fogoalerta/propagacao.py` | Vento x foco: o vento leva o fogo para a comunidade? (estimativa simples) |
 | `fogoalerta/conhecimento.py` | Busca na base de orientações |
 | `fogoalerta/relatos.py` | Registro de relatos e canais |

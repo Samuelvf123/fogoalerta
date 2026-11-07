@@ -41,13 +41,14 @@ async def main() -> None:
             break
         if not texto:
             continue
-        if detectar_emergencia(texto):
+        emergencia = detectar_emergencia(texto)
+        if emergencia:
             print("\nbot> [mensagem fixa de emergência]", MENSAGEM_EMERGENCIA)
         try:
             if texto == "/boletim":
                 resposta = await agente.boletim_radio(CHAT_TESTE)
             else:
-                resposta = await agente.responder(CHAT_TESTE, texto)
+                resposta = await agente.responder(CHAT_TESTE, texto, emergencia_avisada=emergencia)
         except ErroLLM as e:
             resposta = f"[ERRO DA IA: {e.tipo}] {e}"
         print("\nbot>", resposta, "\n")

@@ -290,3 +290,74 @@ def test_tempo_traz_vento_atual():
     assert "vento vindo do leste para o oeste" in r["resumo_em_portugues"]
     del dados["current"]  # sem "current": usa a direção predominante do dia
     assert clima.resumir(dados)["vento_agora"] == {"de_graus": 80, "kmh": 10.0}
+
+
+# ---------------------------------------------------------------- qualidade do ar
+from fogoalerta import ar  # noqa: E402
+
+
+@pytest.mark.parametrize("pm, esperado", [(8, "Boa"), (15, "Boa"), (15.1, "Moderada"), (60, "Ruim"),
+                                          (100, "Muito ruim"), (200, "Péssima")])
+def test_classificar_iqar(pm, esperado):
+    assert ar.classificar(pm)[0] == esperado
+
+
+def test_ar_media_24h_ate_agora():
+    horas = [f"2026-11-06T{h:02d}:00" for h in range(24)] + [f"2026-11-07T{h:02d}:00" for h in range(24)]
+    valores = [10.0] * 24 + [70.0] * 24  # ontem limpo, hoje fumaça
+    dados = {"current": {"time": "2026-11-07T11:00", "pm2_5": 80.0},
+             "hourly": {"time": horas, "pm2_5": valores}}
+    r = ar.resumir(dados)
+    # últimas 24 h até 11h de hoje: 12 h de ontem (10) + 12 h de hoje (70) = média 40 -> Moderada
+    assert r["pm2_5_media_24h"] == 40.0 and r["qualidade"] == "Moderada"
+    assert "agora: 80 µg/m³" in r["resumo_em_portugues"] and "modelo" in r["fonte"]
+
+
+def test_ar_sem_dado():
+    assert "erro" in ar.resumir({"current": {}, "hourly": {}})
+
+
+# ---------------------------------------------------------------- mensagens encaminhadas (boatos)
+from datetime import datetime, timezone  # noqa: E402
+
+from fogoalerta import encaminhada  # noqa: E402
+
+
+def test_prefixo_encaminhada_com_data_antiga():
+    agora = datetime(2026, 11, 7, 10, 0, tzinfo=encaminhada.FUSO)
+    original = datetime(2026, 11, 4, 18, 30, tzinfo=timezone.utc)  # 14h30 em Manaus
+    p = encaminhada.prefixo(original, agora)
+    assert "ENCAMINHOU" in p and "04/11 às 14h30" in p and "há 2 dias" in p
+
+
+def test_ha_quanto_tempo():
+    agora = datetime(2026, 11, 7, 10, 0, tzinfo=encaminhada.FUSO)
+    assert encaminhada.ha_quanto_tempo(datetime(2026, 11, 7, 9, 30, tzinfo=encaminhada.FUSO), agora) == "há menos de 1 hora"
+    assert encaminhada.ha_quanto_tempo(datetime(2026, 11, 7, 7, 0, tzinfo=encaminhada.FUSO), agora) == "há 3 horas"
+    assert encaminhada.prefixo(None, agora).count("data original desconhecida") == 1
+
+
+# ---------------------------------------------------------------- voz (texto -> áudio)
+from fogoalerta import voz  # noqa: E402
+
+
+def test_preparar_texto_para_fala():
+    t = ("🧪 SIMULAÇÃO: **3 focos** a 4,3 km.\n• Ligue **193**.\nVento de 12 km/h, chuva de 1,5 mm, "
+         "PM2,5 de 40 µg/m³. Veja https://maps.google.com/?q=1,2\n```\nRELATO FA-1\nTipo: Fogo\n```")
+    f = voz.preparar_texto(t)
+    assert "um nove três" in f and "quilômetros por hora" in f and "4,3 quilômetros" in f
+    assert "1,5 milímetros" in f and "PM dois vírgula cinco" in f and "microgramas" in f
+    assert "**" not in f and "http" not in f and "🧪" not in f and "RELATO FA-1" not in f
+    assert "mensagem escrita" in f
+
+
+def test_texto_longo_e_cortado():
+    f = voz.preparar_texto("Frase de teste com várias palavras. " * 80)
+    assert len(f) < voz.LIMITE + 60 and f.endswith("Os detalhes estão na mensagem escrita.")
+
+
+def test_preferencia_de_audio(tmp_path):
+    estado = Estado(tmp_path / "e.json")
+    assert estado.preferencia(5, "audio", False) is False
+    estado.definir_preferencia(5, "audio", True)
+    assert Estado(tmp_path / "e.json").preferencia(5, "audio") is True  # persiste em arquivo

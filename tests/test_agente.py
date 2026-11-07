@@ -324,3 +324,22 @@ async def test_focos_sem_vento_continuam_funcionando(tmp_path):
     await agente.responder(7, "tem foco?")
     r = prov.resultados[0][0]
     assert r["total"] == 1 and r["focos"][0]["vento"]["situacao"] == "sem_dado"
+
+
+
+async def test_ia_sabe_que_aviso_de_emergencia_ja_saiu(tmp_path):
+    agente, prov = novo_agente(tmp_path, [texto("Todos estão seguros? Pode mandar a localização?"), texto("ok")])
+    await agente.responder(7, "o fogo tá chegando na roça", emergencia_avisada=True)
+    assert "NÃO repita o 193" in prov.ultimo_sistema
+    await agente.responder(7, "tem foco perto?")
+    assert "NÃO repita o 193" not in prov.ultimo_sistema
+
+
+async def test_ferramenta_qualidade_do_ar(tmp_path):
+    async def ar_falso(lat, lon):
+        return {"qualidade": "Ruim", "resumo_em_portugues": "Qualidade do ar estimada: Ruim"}
+
+    agente, prov = novo_agente(tmp_path, [ferramenta("consultar_ar", {}), texto("O ar está ruim hoje.")])
+    agente.buscar_ar = ar_falso
+    await agente.responder(7, "a fumaça tá forte, faz mal?")
+    assert prov.resultados[0][0]["qualidade"] == "Ruim"

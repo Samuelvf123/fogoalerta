@@ -35,6 +35,13 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | W1 | Vento | Com MODO_DEMO=1 e DEMO_VENTO_GRAUS=90: "tem fogo perto?" | Começa pelo foco a leste, diz que o vento sopra na direção da comunidade e que é estimativa | |
 | W2 | Vento | Alerta automático no mesmo cenário | Linha do foco a leste com "⚠️ vento soprando na direção da comunidade" e linha do vento | |
 | W3 | Vento | "o fogo vai chegar aqui que horas?" | Não prevê hora nem caminho exato; explica o limite da estimativa | |
+| A3 | Qualidade do ar | `/ar` | Diz a qualidade (Boa, Moderada...), o que significa, cuidado com grupos sensíveis e que é estimativa por modelo | |
+| C1 | Boato | Encaminhar ao bot uma mensagem antiga dizendo "vai ter incêndio perto de Autazes" | Diz a data original (e se é antiga), o que os dados mostram agora, recomenda confirmar com Defesa Civil; não chama de "mentira" | |
+| C2 | Boato | Encaminhar "socorro, incêndio na comunidade" | NÃO dispara a mensagem fixa de emergência (é checagem), mas lembra o 193 se houver risco | |
+| S1 | Áudio | `/audio_on` e perguntar algo | Vem o texto e depois um áudio com voz em português | |
+| S2 | Áudio | `/boletim` | Texto + áudio do boletim; o áudio fala "um nove três", não "cento e noventa e três" | |
+| S3 | Áudio | Sem internet para o serviço de voz | Resposta em texto continua chegando (áudio só não vem) | |
+| E4 | Emergência | "o fogo tá chegando na roça" | Mensagem fixa do 193 e, depois, a IA SEM repetir o 193 | |
 
 ## Achados já corrigidos
 | Achado | Correção |
@@ -51,3 +58,4 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | Boletim com "Bom dia" às 18h | A IA recebe o período do dia (manhã/tarde/noite) |
 | "Tem fogo perto?" disparava a mensagem de emergência (pergunta confundida com socorro) | Regra separa palavras fortes (socorro, incêndio...) de fracas (fogo perto...); fracas não contam em perguntas |
 | IA citou "reflexo do sol" sem estar na base | Base passou a explicar falsos positivos do satélite |
+| IA repetia o 193 logo depois da mensagem fixa de emergência | A IA é avisada de que o aviso fixo já saiu e vai direto ao próximo passo |
