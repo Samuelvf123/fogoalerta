@@ -42,14 +42,28 @@ _EMERGENCIA_FORTE = [
     r"\bpegando fogo\b", r"\bpegou fogo\b", r"\bta queimando\b", r"\besta queimando\b",
     # "chamas" no plural: "chama" sozinho confunde com "como se chama".
     r"\bincendio\b", r"\bsocorro\b", r"\bchamas\b", r"\blabaredas?\b",
-    r"\bnao (consigo|da pra) respirar\b", r"\bcasa queimando\b", r"\bfogo alto\b",
+    r"\bcasa queimando\b", r"\bfogo alto\b",
 ]
 # Fracas: "fogo perto", "fumaça forte"... são emergência numa afirmação ("o fogo tá chegando na roça"),
 # mas não numa pergunta de consulta ("tem fogo perto?").
 _EMERGENCIA_FRACA = [
     r"\bfogo (esta |ta )?(perto|chegando|aqui)\b", r"\bfogo (na|no) (casa|roca|quintal|comunidade|mato)\b",
-    r"\bfumaca (forte|muito|demais)\b", r"\bfalta de ar\b", r"\bfogo ativo\b",
+    r"\bfumaca (forte|muito|demais)\b", r"\bfogo ativo\b",
 ]
+# Saúde: dificuldade de respirar é caso de SAMU (192), não de Bombeiros. Vale até em pergunta,
+# porque quem pergunta "minha filha tá com falta de ar, o que dou?" está descrevendo uma urgência.
+_SAUDE = [
+    r"\bfalta de ar\b", r"\bnao (consigo|consegue|da pra|ta conseguindo) respirar\b", r"\bsufoca(ndo|da|do)?\b",
+    r"\blabios? roxos?\b", r"\bdesmai(ou|ando|o)\b", r"\bchiado no peito\b", r"\brespira(cao|ndo) (dificil|com dificuldade)\b",
+]
+
+MENSAGEM_SAUDE = (
+    "🚑 Se alguém está com muita falta de ar, lábios ou unhas roxas, chiado forte, desmaio ou confusão, "
+    "LIGUE 192 (SAMU) ou vá à emergência agora. Crianças pequenas, idosos, gestantes e quem tem asma "
+    "ou doença do coração precisam de atenção ainda mais rápida. Enquanto isso, leve a pessoa para um "
+    "lugar com menos fumaça e mantenha-a sentada e calma."
+)
+
 _PERGUNTA = re.compile(r"(\?\s*$)|^(tem|ha|existe|teve|houve|como|onde|qual|quais|quando|o que|sera)\b")
 
 _AUTORIZA = [
@@ -58,6 +72,30 @@ _AUTORIZA = [
     r"\bpode queimar sem problema\b",
     r"\b(eu )?autorizo\b",
 ]
+
+
+# Afirmações jurídicas categóricas que a base não sustenta (achado do QA de 07/11).
+_JURIDICO = re.compile(
+    r"sem (nenhuma )?exce[cç][aã]o|n[aã]o h[aá] (nenhuma )?exce[cç][aã]o|n[aã]o existe (nenhuma )?exce[cç][aã]o|"
+    r"n[aã]o precisa(m)? de autoriza[cç][aã]o|dispensa(da)? (de )?autoriza[cç][aã]o|sem precisar de autoriza[cç][aã]o",
+    re.I)
+FRASE_JURIDICA_SEGURA = ("Não tenho confirmação se existe alguma exceção para o seu caso: antes de qualquer uso do fogo, "
+                         "procure o Ipaam.")
+
+
+def corrigir_afirmacao_juridica(resposta: str) -> str:
+    """Troca frases que afirmam 'sem exceção' ou 'não precisa de autorização' por uma frase segura."""
+    frases = re.split(r"(?<=[.!?])\s+", resposta)
+    trocou = False
+    saida = []
+    for f in frases:
+        if _JURIDICO.search(f):
+            if not trocou:
+                saida.append(FRASE_JURIDICA_SEGURA)
+                trocou = True
+            continue
+        saida.append(f)
+    return " ".join(saida) if trocou else resposta
 
 
 def limpar_entrada(texto: str | None) -> str:
@@ -72,6 +110,11 @@ def detectar_emergencia(texto: str) -> bool:
     if _PERGUNTA.search(t):
         return False
     return any(re.search(p, t) for p in _EMERGENCIA_FRACA)
+
+
+def detectar_emergencia_saude(texto: str) -> bool:
+    t = _norm(texto)
+    return any(re.search(p, t) for p in _SAUDE)
 
 
 def parece_autorizar_queima(resposta: str) -> bool:
@@ -89,6 +132,7 @@ def revisar_saida(resposta: str, usou_focos: bool) -> str:
     resposta = (resposta or "").strip() or "Desculpe, não consegui responder agora. Tente de novo."
     if parece_autorizar_queima(resposta):
         return RESPOSTA_SEM_AUTORIZACAO
+    resposta = corrigir_afirmacao_juridica(resposta)
     if usou_focos and not tem_aviso_foco(resposta):
         resposta = f"{resposta}\n\n{AVISO_FOCO}"
     return resposta

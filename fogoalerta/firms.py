@@ -101,7 +101,7 @@ async def baixar_focos(caixa: tuple[float, float, float, float], dias: int,
     """Baixa os focos de todas as fontes configuradas dentro da caixa (oeste, sul, leste, norte)."""
     if not CONFIG.firms_map_key:
         raise FirmsErro("FIRMS_MAP_KEY não configurada no .env")
-    dias = max(1, min(int(dias), 5))
+    dias = max(1, min(int(dias), 6))
     chave = (caixa, dias)
     agora = time.monotonic()
     if chave in _CACHE and agora - _CACHE[chave][0] < CACHE_SEGUNDOS:
@@ -130,10 +130,13 @@ async def baixar_focos(caixa: tuple[float, float, float, float], dias: int,
     return focos
 
 
-def filtrar_proximos(focos: list[Foco], lat: float, lon: float, raio_km: float) -> list[dict]:
-    """Mantém só os focos dentro do raio, remove duplicados (vários satélites no mesmo ponto) e ordena."""
+def filtrar_proximos(focos: list[Foco], lat: float, lon: float, raio_km: float,
+                     desde: datetime | None = None) -> list[dict]:
+    """Mantém só os focos dentro do raio (e depois de `desde`), remove duplicados e ordena."""
     vistos: dict[tuple, dict] = {}
     for f in focos:
+        if desde is not None and f.data_hora_utc < desde:
+            continue
         d = distancia_km(lat, lon, f.lat, f.lon)
         if d > raio_km:
             continue
@@ -172,5 +175,9 @@ async def focos_proximos(lat: float, lon: float, raio_km: float = 10, dias: int 
     if CONFIG.modo_demo:
         return filtrar_proximos(focos_demo(lat, lon), lat, lon, raio_km)
     caixa = caixa_ao_redor(lat, lon, raio_km)
-    focos = await baixar_focos(caixa, dias, cliente)
-    return filtrar_proximos(focos, lat, lon, raio_km)
+    # O FIRMS conta "dias" pelo calendário em UTC: "1" = só o dia de hoje em UTC, que em Manaus
+    # começa às 20h. De madrugada isso escondia os focos da tarde anterior (achado no QA de 07/11).
+    # Por isso pedimos um dia a mais e cortamos pelas últimas `dias` x 24 horas de verdade.
+    focos = await baixar_focos(caixa, dias + 1, cliente)
+    desde = datetime.now(timezone.utc) - timedelta(hours=24 * dias)
+    return filtrar_proximos(focos, lat, lon, raio_km, desde=desde)

@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fogoalerta.agente import Agente  # noqa: E402
 from fogoalerta.armazenamento import Estado  # noqa: E402
-from fogoalerta.guardrails import MENSAGEM_EMERGENCIA, detectar_emergencia  # noqa: E402
+from fogoalerta.guardrails import (MENSAGEM_EMERGENCIA, MENSAGEM_SAUDE, detectar_emergencia,  # noqa: E402
+                                   detectar_emergencia_saude)
 from fogoalerta.llm import ErroLLM  # noqa: E402
 
 CHAT_TESTE = 1
@@ -42,13 +43,17 @@ async def main() -> None:
         if not texto:
             continue
         emergencia = detectar_emergencia(texto)
+        saude = detectar_emergencia_saude(texto)
+        if saude:
+            print("\nbot> [mensagem fixa de saúde]", MENSAGEM_SAUDE)
         if emergencia:
             print("\nbot> [mensagem fixa de emergência]", MENSAGEM_EMERGENCIA)
         try:
             if texto == "/boletim":
                 resposta = await agente.boletim_radio(CHAT_TESTE)
             else:
-                resposta = await agente.responder(CHAT_TESTE, texto, emergencia_avisada=emergencia)
+                resposta = await agente.responder(CHAT_TESTE, texto, emergencia_avisada=emergencia,
+                                                  saude_avisada=saude)
         except ErroLLM as e:
             resposta = f"[ERRO DA IA: {e.tipo}] {e}"
         print("\nbot>", resposta, "\n")

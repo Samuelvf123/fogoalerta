@@ -24,7 +24,7 @@ from .armazenamento import Estado
 from .config import CONFIG
 from .firms import FirmsErro
 from .formatacao import para_html, sem_markdown
-from .guardrails import MENSAGEM_EMERGENCIA, detectar_emergencia
+from .guardrails import MENSAGEM_EMERGENCIA, MENSAGEM_SAUDE, detectar_emergencia, detectar_emergencia_saude
 from .llm import ErroLLM
 
 logging.basicConfig(format="%(asctime)s %(levelname)s %(name)s: %(message)s", level=logging.INFO)
@@ -134,11 +134,15 @@ async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE
         log.info("Mensagem encaminhada recebida (original de %s).", origem.date)
         await update.effective_message.reply_text(encaminhada.aviso_curto(origem.date))
     emergencia = detectar_emergencia(texto) and not origem
+    saude = detectar_emergencia_saude(texto) and not origem
+    if saude:
+        await update.effective_message.reply_text(MENSAGEM_SAUDE)
     if emergencia:
         await update.effective_message.reply_text(MENSAGEM_EMERGENCIA)
     await context.bot.send_chat_action(chat_id, ChatAction.TYPING)
     try:
-        resposta = await agente.responder(chat_id, texto, imagem=imagem, emergencia_avisada=emergencia)
+        resposta = await agente.responder(chat_id, texto, imagem=imagem, emergencia_avisada=emergencia,
+                                          saude_avisada=saude)
     except ErroLLM as e:
         resposta = mensagem_erro_ia(e)
     await enviar_texto(update, resposta)

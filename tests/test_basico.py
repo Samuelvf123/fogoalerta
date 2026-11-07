@@ -83,7 +83,6 @@ def test_resumo_tempo_risco_alto():
     "Socorro, tá pegando fogo aqui perto de casa",
     "o fogo está chegando na roça",
     "INCÊNDIO na comunidade",
-    "não consigo respirar com essa fumaça",
     "socorro, tem fogo perto da minha casa?",   # pergunta, mas com palavra forte
     "o fogo tá perto da escola",
     "fumaça forte aqui na comunidade",
@@ -389,3 +388,45 @@ def test_italico_vira_html_sem_quebrar_lista():
     h = para_html("*Aviso:* o vento pode mudar.\n* item da lista\nconta 2*3*4")
     assert "<i>Aviso:</i>" in h and "• item da lista" in h and "2*3*4" in h
     assert sem_markdown("*Aviso:* ok") == "Aviso: ok"
+
+
+def test_janela_de_24h_de_verdade():
+    from datetime import timedelta
+    agora = datetime(2026, 11, 7, 5, 0, tzinfo=timezone.utc)  # 01h em Manaus
+    perto = (-3.60, -59.10)
+    focos = [
+        firms.Foco(*perto, agora - timedelta(hours=15), "N", "VIIRS", "nominal", 1.0, "X"),  # ontem à tarde
+        firms.Foco(perto[0] + 0.03, perto[1], agora - timedelta(hours=30), "N", "VIIRS", "nominal", 1.0, "X"),
+    ]
+    r = firms.filtrar_proximos(focos, *AUTAZES, 30, desde=agora - timedelta(hours=24))
+    assert len(r) == 1  # o de 15 h atrás entra; o de 30 h atrás fica fora
+
+
+
+@pytest.mark.parametrize("texto", [
+    "minha filha de 4 anos tá com falta de ar e tossindo muito, que remédio dou?",   # achado do QA de 07/11
+    "não consigo respirar com essa fumaça",
+    "meu pai desmaiou com a fumaça",
+    "o bebê tá com os lábios roxos",
+])
+def test_emergencia_de_saude_vai_para_o_samu(texto):
+    assert guardrails.detectar_emergencia_saude(texto)
+    assert not guardrails.detectar_emergencia(texto)  # não é caso de Bombeiros
+    assert "192" in guardrails.MENSAGEM_SAUDE
+
+
+def test_saude_nao_dispara_em_pergunta_comum():
+    assert not guardrails.detectar_emergencia_saude("a fumaça faz mal pra saúde?")
+
+
+def test_corrige_afirmacao_juridica_inventada():
+    r = guardrails.revisar_saida("O uso do fogo é proibido por decreto no Amazonas, sem exceção de período para esse tipo de "
+                                 "prática. Existem alternativas sem fogo.", usou_focos=False)
+    assert "sem exceção" not in r and guardrails.FRASE_JURIDICA_SEGURA in r and r.endswith("Existem alternativas sem fogo.")
+    r2 = guardrails.revisar_saida("Para roça de subsistência não precisa de autorização.", usou_focos=False)
+    assert "não precisa" not in r2
+
+
+def test_base_tem_secao_de_subsistencia():
+    r = BaseConhecimento().buscar("agricultor familiar roça de subsistência precisa de autorização para queimar?")
+    assert any("subsistência" in x["tema"] for x in r)

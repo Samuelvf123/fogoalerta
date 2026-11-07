@@ -370,3 +370,10 @@ async def test_pedido_do_boletim_depende_do_modo(tmp_path, monkeypatch):
         prov.nova_conversa = lambda h, t, i: pedidos.append(t) or orig(h, t, i)
         await agente.boletim_radio(7)
         assert esperado in pedidos[0]
+
+
+
+async def test_ia_sabe_que_aviso_de_saude_ja_saiu(tmp_path):
+    agente, prov = novo_agente(tmp_path, [texto("Mantenha a casa fechada e procure atendimento.")])
+    await agente.responder(7, "minha filha tá com falta de ar", saude_avisada=True)
+    assert "SAMU 192" in prov.ultimo_sistema and "Nunca indique remédio" in prov.ultimo_sistema

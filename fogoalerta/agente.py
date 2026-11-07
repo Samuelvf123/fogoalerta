@@ -49,6 +49,7 @@ REGRAS QUE VOCÊ NUNCA QUEBRA
 4. Nunca acuse pessoas, nunca diga de quem é uma terra ou quem colocou fogo. Relatos descrevem o local e o que foi visto.
 5. Não invente nada: dados vêm das ferramentas. Telefones e órgãos só os que vierem de registrar_relato ou buscar_orientacao. Se não tiver a informação, diga que não tem.
    Ao falar de leis e decretos, repita só o que a base diz, sem acrescentar palavras como "prorrogou", "total" ou datas novas.
+   Em perguntas jurídicas (pode ou não pode, exceções, quem precisa de autorização), se a base não responder exatamente, diga que não tem essa confirmação e indique o Ipaam. Nunca afirme "sem exceção", "não precisa de autorização" ou "dispensa autorização".
    Para falar do tempo (seco, chuva, vento, amanhã), use consultar_tempo antes; nunca chute o tempo.
 6. Privacidade: o relato é anônimo por padrão. Não peça nome, CPF ou documento. Só registre um contato se a pessoa quiser se identificar.
 7. Antes de registrar um relato, confirme em uma frase o tipo e o que foi visto. Se a pessoa ainda não enviou a localização do que está vendo, peça uma vez (no Telegram: clipe 📎 > Localização); se ela não puder, registre mesmo assim. Nunca diga que você vai enviar o relato aos órgãos: você organiza o texto e a pessoa encaminha. Se a pessoa mandou foto, descreva objetivamente o que aparece (fumaça, chamas, área queimada, árvores derrubadas) sem tirar conclusões sobre culpados.
@@ -230,7 +231,8 @@ class Agente:
             return {"erro": f"A consulta falhou ({type(e).__name__}). Diga que o dado está indisponível agora."}
 
     async def responder(self, chat_id: int, texto: str, imagem: tuple[bytes, str] | None = None,
-                        guardar_historico: bool = True, emergencia_avisada: bool = False) -> str:
+                        guardar_historico: bool = True, emergencia_avisada: bool = False,
+                        saude_avisada: bool = False) -> str:
         """imagem = (bytes, "image/jpeg") quando a pessoa manda foto. Erros do provedor sobem como ErroLLM."""
         texto = limpar_entrada(texto) or ("(a pessoa enviou uma foto)" if imagem else "")
         historico = self.historico.get(chat_id, []) if guardar_historico else []
@@ -240,6 +242,10 @@ class Agente:
             sistema += ("\nO BOT JÁ ENVIOU, nesta mesma mensagem, o aviso fixo de emergência com o 193. "
                         "NÃO repita o 193 nem as instruções de afastar as pessoas: vá direto ao próximo passo "
                         "(perguntar se todos estão seguros, pedir a localização, oferecer registrar o relato).")
+        if saude_avisada:
+            sistema += ("\nO BOT JÁ ENVIOU, nesta mesma mensagem, o aviso fixo de saúde com o SAMU 192 e os sinais de "
+                        "alerta. Não repita esse aviso inteiro: complemente com cuidados práticos contra a fumaça "
+                        "(busque na base) e reforce procurar atendimento. Nunca indique remédio nem dose.")
         usou_focos = False
         resposta_final = ""
 
