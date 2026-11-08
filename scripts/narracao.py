@@ -7,6 +7,7 @@ Os áudios vão para a pasta Vídeos\\FogoAlerta_narracao do seu usuário,
 um arquivo por cena, em duas vozes (antonio e francisca).
 """
 import asyncio
+import zipfile
 from pathlib import Path
 
 import edge_tts
@@ -52,6 +53,12 @@ async def main():
             arquivo = pasta / f"cena_{i:02d}.mp3"
             await edge_tts.Communicate(texto, voz).save(str(arquivo))
             print("ok", nome, arquivo.name)
+        # um .zip por voz, para anexar de uma vez só na conversa
+        zip_voz = destino / f"narracao_{nome}.zip"
+        with zipfile.ZipFile(zip_voz, "w") as z:
+            for arquivo in sorted(pasta.glob("cena_*.mp3")):
+                z.write(arquivo, arquivo.name)
+        print("zip:", zip_voz)
     print("Pronto! Áudios em:", destino)
 
 
