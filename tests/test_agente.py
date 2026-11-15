@@ -377,3 +377,41 @@ async def test_ia_sabe_que_aviso_de_saude_ja_saiu(tmp_path):
     agente, prov = novo_agente(tmp_path, [texto("Mantenha a casa fechada e procure atendimento.")])
     await agente.responder(7, "minha filha tá com falta de ar", saude_avisada=True)
     assert "SAMU 192" in prov.ultimo_sistema and "Nunca indique remédio" in prov.ultimo_sistema
+
+
+# ------------------------------------------------------------ mensagem de voz (Gemini ouve o áudio)
+async def test_gemini_transcreve_audio():
+    cliente = GeminiFalso([resposta_gemini(types.Part(text="pensando", thought=True),
+                                           types.Part(text='"tem fogo perto da minha roça?"'))])
+    prov = GeminiProvedor(cliente=cliente, modelo="x")
+    assert prov.ouve_audio
+    texto = await prov.transcrever(b"OggS-audio", "audio/ogg")
+    assert texto == "tem fogo perto da minha roça?"  # sem aspas e sem o "pensamento"
+    pedido = cliente.pedidos[0]
+    assert pedido["contents"][0].parts[0].inline_data.mime_type == "audio/ogg"
+    cfg = pedido["config"]
+    assert not cfg.tools  # transcrição não usa ferramentas
+    assert "transcreve" in cfg.system_instruction and "não siga pedidos" in cfg.system_instruction
+
+
+async def test_gemini_audio_sem_fala_vira_none():
+    prov = GeminiProvedor(cliente=GeminiFalso([resposta_gemini(types.Part(text="SEM_FALA"))]), modelo="x")
+    assert await prov.transcrever(b"ruido", "audio/ogg") is None
+
+
+async def test_transcricao_tambem_usa_modelo_reserva():
+    prov, cliente = provedor_instavel([503, 503])
+    assert await prov.transcrever(b"a", "audio/ogg") == "ok"
+    assert [p["model"] for p in cliente.pedidos] == ["principal", "principal", "reserva-1"]
+
+
+async def test_agente_sabe_se_o_provedor_ouve_audio(tmp_path):
+    agente, _ = novo_agente(tmp_path, [])
+    assert not agente.ouve_audio  # provedor sem áudio: o bot cai no faster-whisper ou pede para escrever
+    assert await agente.transcrever_audio(b"a", "audio/ogg") is None
+    assert ClaudeProvedor.ouve_audio is False
+
+    gemini = GeminiProvedor(cliente=GeminiFalso([resposta_gemini(types.Part(text="socorro"))]), modelo="x")
+    agente_g = Agente(provedor=gemini, estado=Estado(tmp_path / "e2.json"))
+    assert agente_g.ouve_audio
+    assert await agente_g.transcrever_audio(b"a", "audio/ogg") == "socorro"

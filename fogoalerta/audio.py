@@ -1,5 +1,7 @@
-"""Transcrição de áudio (mensagem de voz) — OPCIONAL.
+"""Transcrição LOCAL de áudio (mensagem de voz) — reserva opcional.
 
+Com o Gemini (padrão), quem transcreve a mensagem de voz é o próprio Gemini (llm.py) e este
+módulo não é usado. Ele serve para o provedor Claude, cuja API não recebe áudio.
 Usa a biblioteca faster-whisper, que roda no próprio computador (sem custo de API).
 Instale com:  pip install faster-whisper
 Na primeira vez, ela baixa o modelo (~500 MB para "small"). Sem a biblioteca,

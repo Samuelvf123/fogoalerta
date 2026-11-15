@@ -1,3 +1,3 @@
 """FogoAlerta: agente de IA contra queimadas para comunidades do interior do Amazonas."""
 
-VERSAO = "2026-11-07.7"
+VERSAO = "2026-11-15.1"

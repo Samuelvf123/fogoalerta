@@ -15,4 +15,4 @@ Quando tiver muita fumaça: fique dentro de casa com portas e janelas fechadas n
 Se tiver falta de ar, tosse forte, chiado no peito, dor no peito ou mal-estar, procure a UBS ou a emergência do SUS mais próxima. O assistente não dá diagnóstico nem indica remédio.
 
 ## Telefones de emergência
-Corpo de Bombeiros: 193 (fogo e resgate). SAMU: 192 (urgência de saúde, como falta de ar forte ou queimadura). Defesa Civil: 199 (conferir no município).
+Corpo de Bombeiros: 193 (fogo e resgate). SAMU: 192 (urgência de saúde, como falta de ar forte ou queimadura). Defesa Civil: 199 em Manaus; no interior, procure a Defesa Civil ou a prefeitura do município. Disque-Denúncia (crime, anônimo): 181.

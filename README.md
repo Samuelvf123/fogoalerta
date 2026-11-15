@@ -71,15 +71,18 @@ Para mostrar a **análise de vento** no vídeo, use também `DEMO_VENTO_GRAUS=90
 - **Respostas em áudio:** com `edge-tts` (já está no requirements), o bot responde em voz quando a pessoa manda áudio,
   ou sempre, com `/audio_on`. O `/boletim` sai também em áudio, pronto para a rádio tocar. Precisa de internet
   (o texto passa pelo serviço de voz da Microsoft).
-- **Entender áudio recebido** é opcional: `pip install faster-whisper` (transcreve no próprio computador; baixa ~500 MB
-  na primeira vez).
+- **Mensagem de voz:** a pessoa pode falar em vez de escrever. O Gemini transcreve o áudio, o bot mostra
+  "🎙️ Entendi: ..." para a pessoa conferir, e só então a mensagem passa pelas regras de segurança e pelo agente.
+  A resposta volta em texto e em áudio. Áudios de até 3 minutos; o áudio não é salvo. Com `LLM_PROVEDOR=claude`
+  (a API do Claude não recebe áudio), dá para usar o `faster-whisper` local: `pip install faster-whisper`.
 
 ---
 
 ## Como funciona
 
 ```
-Mensagem → [guardrail: emergência? manda 193 na hora, sem IA]
+Mensagem (texto, foto, ou voz → Gemini transcreve)
+         → [guardrail: emergência? manda 193 na hora, sem IA]
          → Agente (Gemini ou Claude, via llm.py) decide quais ferramentas usar:
               consultar_focos   → NASA FIRMS (focos por raio, distância e direção)
               consultar_tempo   → Open-Meteo (calor, vento, dias sem chuva)
@@ -112,7 +115,7 @@ A cada 30 min: alertas.py procura focos novos perto de cada comunidade e avisa (
 
 ## ⚠️ O que ainda precisa ser conferido pela equipe
 - [ ] **Coordenadas** da sede de Autazes (aproximadas) e das comunidades das entrevistas → `data/comunidades.json`.
-- [ ] **Canal de denúncia do Ipaam** e número da Defesa Civil → `data/canais.json` (marcados com PREENCHER/conferir).
+- [x] **Canais de denúncia** (Ipaam, Ibama, 181, Defesa Civil) → `data/canais.json`, conferidos em 15/11/2026 com as fontes no próprio arquivo.
 - [ ] **Texto do Decreto nº 55.339/2026**: exceções e prorrogação → `data/orientacoes/01_proibicao_e_regras.md`.
 - [ ] Detalhes técnicos das alternativas sem fogo (Embrapa/IDAM) → `02_alternativas_sem_fogo.md`.
 - [ ] Ajustar a base de orientações com o que apareceu nas **entrevistas**.

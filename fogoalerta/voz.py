@@ -24,6 +24,7 @@ _TROCAS = [
     (re.compile(r"\b193\b"), "um nove três"),
     (re.compile(r"\b192\b"), "um nove dois"),
     (re.compile(r"\b199\b"), "um nove nove"),
+    (re.compile(r"\b181\b"), "um oito um"),
     (re.compile(r"\bkm/h\b"), "quilômetros por hora"),
     (re.compile(r"(\d)\s*km\b"), r"\1 quilômetros"),
     (re.compile(r"(\d)\s*mm\b"), r"\1 milímetros"),

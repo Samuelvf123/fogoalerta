@@ -147,6 +147,16 @@ class Agente:
         self.local_relato: dict[int, tuple[float, float]] = {}  # localização enviada para o próximo relato
         self.ultimo_alerta: dict[int, tuple[str, datetime]] = {}  # para entender "o que eu faço?" depois do alerta
 
+    @property
+    def ouve_audio(self) -> bool:
+        return bool(getattr(self.provedor, "ouve_audio", False))
+
+    async def transcrever_audio(self, dados: bytes, mime: str) -> str | None:
+        """Mensagem de voz → texto, pelo próprio provedor de IA (Gemini). None se não houver fala."""
+        if not self.ouve_audio:
+            return None
+        return await self.provedor.transcrever(dados, mime)
+
     # ------------------------------------------------------------------
     def _contexto(self, chat_id: int) -> str:
         agora = datetime.now(FUSO)

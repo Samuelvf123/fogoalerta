@@ -35,6 +35,7 @@ estado = Estado()
 agente: Agente  # criado em main(), depois de conferir as chaves
 COMUNIDADES = json.loads((CONFIG.pasta_dados / "comunidades.json").read_text(encoding="utf-8"))["comunidades"]
 PASTA_FOTOS = CONFIG.pasta_dados / "relatos" / "fotos"
+LIMITE_AUDIO_SEGUNDOS = 180
 
 BOAS_VINDAS = (
     "Olá! Eu sou o FogoAlerta 🔥🌳\n\n"
@@ -70,7 +71,8 @@ PRIVACIDADE = (
     "• as fotos enviadas para um relato.\n\n"
     "Não guardo seu nome nem seu telefone, a não ser que você peça para se identificar num relato. "
     "As conversas ficam só na memória e somem quando o bot reinicia.\n"
-    "Para gerar respostas em áudio, o texto da resposta passa por um serviço de voz na internet.\n\n"
+    "Para gerar respostas em áudio, o texto da resposta passa por um serviço de voz na internet.\n"
+    "Os áudios que você manda são transcritos pelo serviço de IA e não ficam guardados.\n\n"
     "Atenção: este protótipo usa um serviço de IA de terceiros. Não mande dados pessoais "
     "(CPF, documentos, endereço completo) nas mensagens."
 )
@@ -322,21 +324,41 @@ async def receber_foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await perguntar_ao_agente(update, context, legenda, imagem=(caminho.read_bytes(), "image/jpeg"))
 
 
+async def transcrever(dados: bytes, mime: str) -> str | None:
+    """O Gemini ouve o áudio. Com outro provedor, usa o faster-whisper local, se estiver instalado."""
+    if agente.ouve_audio:
+        return await agente.transcrever_audio(dados, mime)
+    if audio.disponivel():
+        with tempfile.TemporaryDirectory() as tmp:
+            caminho = Path(tmp) / "audio.ogg"
+            caminho.write_bytes(dados)
+            return await asyncio.to_thread(audio.transcrever, str(caminho))
+    return None
+
+
 async def receber_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    if not audio.disponivel():
-        await update.message.reply_text("Ainda não consigo ouvir áudio neste protótipo. Pode escrever, por favor?")
+    msg = update.message
+    if not agente.ouve_audio and not audio.disponivel():
+        await msg.reply_text("Ainda não consigo ouvir áudio neste protótipo. Pode escrever, por favor?")
         return
-    voz = update.message.voice or update.message.audio
-    arquivo = await voz.get_file()
-    with tempfile.TemporaryDirectory() as tmp:
-        caminho = Path(tmp) / "audio.ogg"
-        await arquivo.download_to_drive(caminho)
-        await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
-        texto = await asyncio.to_thread(audio.transcrever, str(caminho))
+    arquivo_voz = msg.voice or msg.audio
+    if (arquivo_voz.duration or 0) > LIMITE_AUDIO_SEGUNDOS:
+        await msg.reply_text("Esse áudio é longo demais para mim. Pode mandar um de até 3 minutos ou escrever?")
+        return
+    await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
+    arquivo = await arquivo_voz.get_file()
+    dados = bytes(await arquivo.download_as_bytearray())  # o áudio não é salvo em disco
+    try:
+        texto = await transcrever(dados, arquivo_voz.mime_type or "audio/ogg")
+    except ErroLLM as e:
+        await enviar_texto(update, mensagem_erro_ia(e))
+        return
     if not texto:
-        await update.message.reply_text("Não entendi o áudio. Pode repetir ou escrever?")
+        await msg.reply_text("Não entendi o áudio. Pode repetir mais perto do celular ou escrever?")
         return
-    await update.message.reply_text(f"🎙️ Entendi: \"{texto}\"")
+    # Mostra o que entendeu: a pessoa confere e corrige se a transcrição errou.
+    eco = texto if len(texto) <= 500 else texto[:500] + "…"
+    await msg.reply_text(f"🎙️ Entendi: \"{eco}\"")
     # Quem fala em áudio recebe a resposta em áudio também.
     await perguntar_ao_agente(update, context, prefixo_encaminhada(update) + texto, em_audio=True)
 
@@ -397,8 +419,10 @@ def main() -> None:
         app.job_queue.run_repeating(tarefa_alertas, interval=CONFIG.intervalo_alerta_min * 60, first=30)
     else:
         log.warning("FIRMS_MAP_KEY ausente: alertas automáticos desligados.")
-    if not audio.disponivel():
-        log.info("faster-whisper não instalado: o bot não entende áudio recebido (opcional).")
+    if agente.ouve_audio:
+        log.info("Mensagens de voz: transcritas pelo %s.", agente.provedor.nome)
+    elif not audio.disponivel():
+        log.info("Mensagens de voz desligadas: este provedor não ouve áudio e o faster-whisper não está instalado.")
     if not voz.disponivel():
         log.info("edge-tts não instalado: respostas só em texto (pip install edge-tts).")
 
