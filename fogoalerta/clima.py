@@ -34,6 +34,12 @@ def _vento_agora(dados: dict, hoje: int) -> dict | None:
     return {"de_graus": graus, "kmh": kmh}
 
 
+def _dias_sem_chuva(n: int) -> str:
+    if n == 0:
+        return "Choveu hoje."
+    return "1 dia sem chuva." if n == 1 else f"{n} dias seguidos sem chuva."
+
+
 def resumir(dados: dict) -> dict:
     """Transforma a resposta diária do Open-Meteo em um resumo para o agente."""
     d = dados["daily"]
@@ -62,7 +68,7 @@ def resumir(dados: dict) -> dict:
         # Frase pronta em português, com vírgula decimal: evita a IA ler "1.5" como "mil e quinhentos".
         "resumo_em_portugues": (
             f"Hoje: máxima de {_br(tmax[hoje], 0)} graus, vento de até {_br(vento[hoje], 0)} km/h, "
-            f"{_br(chuva[hoje])} mm de chuva. {dias_sem_chuva} dia(s) seguido(s) sem chuva. "
+            f"{_br(chuva[hoje])} mm de chuva. {_dias_sem_chuva(dias_sem_chuva)} "
             f"Previsão de {_br(prevista)} mm de chuva nos próximos 3 dias. "
             f"Risco estimado de o fogo se espalhar: {nivel}. "
             f"Agora: {descrever_vento(vento_agora)}."

@@ -196,7 +196,7 @@ class Agente:
             return {
                 "comunidade": u["comunidade"],
                 "raio_km": raio,
-                "periodo": f"últimos {dias} dia(s)",
+                "periodo": "últimas 24 horas" if dias == 1 else f"últimos {dias} dias",
                 "total": len(focos),
                 "focos": focos[:10],
                 "vento_agora": propagacao.descrever_vento(vento) + (" (SIMULADO)" if vento and vento.get("simulado") else ""),

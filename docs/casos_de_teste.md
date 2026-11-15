@@ -89,3 +89,12 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | Criança com falta de ar: sem SAMU 192 (e "falta de ar" disparava o aviso de Bombeiros) | Aviso fixo de saúde com SAMU 192 e sinais de alerta, separado do aviso de incêndio |
 | De madrugada, "último dia" no FIRMS escondia os focos da tarde anterior (o FIRMS conta dias em UTC) | Consulta um dia a mais e filtra as últimas 24 h de verdade |
 | IA afirmou "sem exceção" para roça de subsistência | Base explica que não há confirmação; prompt proíbe afirmar; o código troca essas frases por uma frase segura |
+
+## Teste de voz no Telegram (15/11/2026, celular do Vieira)
+| Teste | Resultado |
+|---|---|
+| Áudio encaminhado e áudio gravado no celular (versão .1) | ❌ "Tive um problema": o Telegram demorou a entregar o áudio (TimedOut) → corrigido na .2 (mais tempo, nova tentativa, mensagem clara) |
+| Áudio com som ruim: "fogo perto da minha comunidade" | ✅ Transcreveu; como frase sem pergunta, disparou o aviso fixo do 193 (comportamento conservador, de propósito) |
+| Áudio: "Tem fogo perto da minha comunidade" | ✅ Transcreveu, consultou o satélite e respondeu em texto e áudio |
+| Resposta dizia "Nos últimos 1 dia(s)" | ⚠️ Texto estranho → corrigido na .3 ("últimas 24 horas") |
+| "qual o WhatsApp do Ipaam para denunciar queimada?" | ✅ (92) 98557-9454 e lembrou do 193 |
