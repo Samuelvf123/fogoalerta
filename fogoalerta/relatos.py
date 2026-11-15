@@ -27,6 +27,12 @@ def canal_para(tipo: str, canais: dict | None = None) -> list[dict]:
     return canais.get(tipo) or canais["outro"]
 
 
+# O relato não leva o nome, mas quem manda pelo WhatsApp ou liga do próprio celular aparece para o órgão.
+AVISO_ANONIMATO = ("O texto do relato não tem o nome da pessoa, mas se ela mandar pelo WhatsApp do órgão ou ligar "
+                   "do próprio celular, o número dela aparece. Para não se identificar de jeito nenhum: "
+                   "Disque-Denúncia 181 (gratuito e anônimo) ou pedir a uma liderança de confiança que encaminhe.")
+
+
 def registrar(tipo: str, descricao: str, comunidade: str | None = None,
               lat: float | None = None, lon: float | None = None,
               fotos: list[str] | None = None, descricao_foto: str | None = None,
@@ -64,6 +70,7 @@ def registrar(tipo: str, descricao: str, comunidade: str | None = None,
         "encaminhar_para": destinos,
         "texto_para_encaminhar": formatar(registro),
         "observacao": "O protótipo não envia aos órgãos sozinho; a pessoa (ou a equipe) encaminha o texto.",
+        **({"aviso_anonimato": AVISO_ANONIMATO} if anonimo else {}),
     }
 
 

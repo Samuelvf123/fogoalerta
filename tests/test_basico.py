@@ -430,3 +430,11 @@ def test_corrige_afirmacao_juridica_inventada():
 def test_base_tem_secao_de_subsistencia():
     r = BaseConhecimento().buscar("agricultor familiar roça de subsistência precisa de autorização para queimar?")
     assert any("subsistência" in x["tema"] for x in r)
+
+
+def test_relato_anonimo_avisa_que_o_numero_aparece_no_whatsapp(tmp_path):
+    from fogoalerta import relatos
+    r = relatos.registrar("queimada_ilegal", "fumaça no ramal", pasta=tmp_path)
+    assert "181" in r["aviso_anonimato"] and "número" in r["aviso_anonimato"]
+    identificado = relatos.registrar("queimada_ilegal", "x", anonimo=False, contato="92 9...", pasta=tmp_path)
+    assert "aviso_anonimato" not in identificado
