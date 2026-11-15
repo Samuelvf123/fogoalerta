@@ -14,7 +14,7 @@ from pathlib import Path
 from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton,
                       ReplyKeyboardMarkup, ReplyKeyboardRemove, Update)
 from telegram.constants import ChatAction, ParseMode
-from telegram.error import BadRequest, NetworkError
+from telegram.error import BadRequest, NetworkError, TimedOut
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, MessageHandler, filters)
 
@@ -36,6 +36,7 @@ agente: Agente  # criado em main(), depois de conferir as chaves
 COMUNIDADES = json.loads((CONFIG.pasta_dados / "comunidades.json").read_text(encoding="utf-8"))["comunidades"]
 PASTA_FOTOS = CONFIG.pasta_dados / "relatos" / "fotos"
 LIMITE_AUDIO_SEGUNDOS = 180
+TEMPO_REDE = 30  # segundos de espera nas chamadas ao Telegram: internet lenta não pode virar erro
 
 BOAS_VINDAS = (
     "Olá! Eu sou o FogoAlerta 🔥🌳\n\n"
@@ -104,7 +105,7 @@ async def enviar_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, texto
     """Manda a resposta também em voz. Se falhar, a pessoa já tem o texto: só registra no log."""
     with tempfile.TemporaryDirectory() as tmp:
         caminho = str(Path(tmp) / "resposta.mp3")
-        await context.bot.send_chat_action(update.effective_chat.id, ChatAction.RECORD_VOICE)
+        await acao_no_chat(context, update.effective_chat.id, ChatAction.RECORD_VOICE)
         if not await voz.sintetizar(texto, caminho):
             return
         # Áudio é um extra: nenhuma falha aqui pode virar "Tive um problema" para a pessoa.
@@ -121,6 +122,14 @@ async def enviar_audio(update: Update, context: ContextTypes.DEFAULT_TYPE, texto
         except NetworkError as e:
             # Inclui TimedOut: muitas vezes o Telegram entrega o áudio mesmo depois do tempo esgotado.
             log.warning("Envio do áudio demorou ou falhou (%s); o texto já foi entregue.", e)
+
+
+async def acao_no_chat(context: ContextTypes.DEFAULT_TYPE, chat_id: int, acao: str) -> None:
+    """Mostra "digitando..." ou "gravando áudio...". É só um enfeite: se a internet falhar, segue em frente."""
+    try:
+        await context.bot.send_chat_action(chat_id, acao)
+    except NetworkError as e:
+        log.warning("Não consegui mostrar '%s' (%s); seguindo.", acao, e)
 
 
 def quer_audio(chat_id: int) -> bool:
@@ -141,7 +150,7 @@ async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.effective_message.reply_text(MENSAGEM_SAUDE)
     if emergencia:
         await update.effective_message.reply_text(MENSAGEM_EMERGENCIA)
-    await context.bot.send_chat_action(chat_id, ChatAction.TYPING)
+    await acao_no_chat(context, chat_id, ChatAction.TYPING)
     try:
         resposta = await agente.responder(chat_id, texto, imagem=imagem, emergencia_avisada=emergencia,
                                           saude_avisada=saude)
@@ -255,7 +264,7 @@ async def cmd_boletim(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not estado.usuario(update.effective_chat.id):
         await update.message.reply_text("Primeiro escolha a comunidade com /comunidade.")
         return
-    await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
+    await acao_no_chat(context, update.effective_chat.id, ChatAction.TYPING)
     try:
         boletim = await agente.boletim_radio(update.effective_chat.id)
     except ErroLLM as e:
@@ -324,6 +333,19 @@ async def receber_foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await perguntar_ao_agente(update, context, legenda, imagem=(caminho.read_bytes(), "image/jpeg"))
 
 
+async def baixar_audio(arquivo_voz) -> bytes:
+    """Baixa o áudio do Telegram com mais tempo de espera e uma nova tentativa (internet lenta)."""
+    for tentativa in range(2):
+        try:
+            arquivo = await arquivo_voz.get_file(read_timeout=TEMPO_REDE, connect_timeout=TEMPO_REDE)
+            return bytes(await arquivo.download_as_bytearray(read_timeout=TEMPO_REDE, connect_timeout=TEMPO_REDE))
+        except TimedOut:
+            if tentativa:
+                raise
+            log.warning("Baixar o áudio demorou demais; tentando de novo.")
+    raise TimedOut("sem resposta")
+
+
 async def transcrever(dados: bytes, mime: str) -> str | None:
     """O Gemini ouve o áudio. Com outro provedor, usa o faster-whisper local, se estiver instalado."""
     if agente.ouve_audio:
@@ -345,13 +367,21 @@ async def receber_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     if (arquivo_voz.duration or 0) > LIMITE_AUDIO_SEGUNDOS:
         await msg.reply_text("Esse áudio é longo demais para mim. Pode mandar um de até 3 minutos ou escrever?")
         return
-    await context.bot.send_chat_action(update.effective_chat.id, ChatAction.TYPING)
-    arquivo = await arquivo_voz.get_file()
-    dados = bytes(await arquivo.download_as_bytearray())  # o áudio não é salvo em disco
+    await acao_no_chat(context, update.effective_chat.id, ChatAction.TYPING)
+    try:
+        dados = await baixar_audio(arquivo_voz)  # fica só na memória; o áudio não é salvo em disco
+    except NetworkError as e:
+        log.warning("Não consegui baixar o áudio do Telegram: %s", e)
+        await msg.reply_text("A internet está lenta e não consegui pegar seu áudio. Pode mandar de novo ou escrever?")
+        return
     try:
         texto = await transcrever(dados, arquivo_voz.mime_type or "audio/ogg")
     except ErroLLM as e:
         await enviar_texto(update, mensagem_erro_ia(e))
+        return
+    except Exception:  # noqa: BLE001 - nenhuma falha na transcrição pode virar "Tive um problema"
+        log.exception("Falha ao transcrever o áudio")
+        await msg.reply_text("Não consegui ouvir o áudio agora. Pode escrever, por favor?")
         return
     if not texto:
         await msg.reply_text("Não entendi o áudio. Pode repetir mais perto do celular ou escrever?")
@@ -391,7 +421,9 @@ def main() -> None:
 
     global agente
     agente = Agente(estado=estado)
-    app = Application.builder().token(CONFIG.telegram_token).build()
+    app = (Application.builder().token(CONFIG.telegram_token)
+           .connect_timeout(15).read_timeout(20).write_timeout(20).pool_timeout(10)
+           .build())
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler(["ajuda", "help"], cmd_ajuda))
     app.add_handler(CommandHandler("privacidade", cmd_privacidade))
