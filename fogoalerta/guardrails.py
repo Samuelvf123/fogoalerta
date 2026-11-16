@@ -64,6 +64,9 @@ MENSAGEM_SAUDE = (
     "lugar com menos fumaça e mantenha-a sentada e calma."
 )
 
+# Achado de 15/11: "vi botando fogo perto do igarapé, ontem de manhã" disparava o aviso do 193.
+_PASSADO = re.compile(r"\b(ontem|anteontem|semana passada|mes passado|dias atras|faz \d+ dias|ha \d+ dias)\b")
+_AGORA = re.compile(r"\b(agora|neste momento|nesse momento|ainda (ta|esta)|continua|chegando)\b")
 _PERGUNTA = re.compile(r"(\?\s*$)|^(tem|ha|existe|teve|houve|como|onde|qual|quais|quando|o que|sera)\b")
 
 _AUTORIZA = [
@@ -108,6 +111,9 @@ def detectar_emergencia(texto: str) -> bool:
     if any(re.search(p, t) for p in _EMERGENCIA_FORTE):
         return True
     if _PERGUNTA.search(t):
+        return False
+    # Relato de algo que já passou ("ontem de manhã") não é emergência agora, a não ser que diga que continua.
+    if _PASSADO.search(t) and not _AGORA.search(t):
         return False
     return any(re.search(p, t) for p in _EMERGENCIA_FRACA)
 

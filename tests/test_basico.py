@@ -438,3 +438,11 @@ def test_relato_anonimo_avisa_que_o_numero_aparece_no_whatsapp(tmp_path):
     assert "181" in r["aviso_anonimato"] and "número" in r["aviso_anonimato"]
     identificado = relatos.registrar("queimada_ilegal", "x", anonimo=False, contato="92 9...", pasta=tmp_path)
     assert "aviso_anonimato" not in identificado
+
+
+def test_emergencia_nao_dispara_para_fato_passado():
+    from fogoalerta.guardrails import detectar_emergencia
+    assert not detectar_emergencia("vi gente derrubando mata e botando fogo perto do igarapé da comunidade, ontem de manhã")
+    assert detectar_emergencia("começou ontem e agora o fogo tá chegando na roça")  # passado, mas continua
+    assert detectar_emergencia("o fogo tá chegando na roça")
+    assert detectar_emergencia("socorro, ontem pegou fogo e de novo hoje")  # palavras fortes sempre valem
