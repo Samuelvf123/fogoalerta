@@ -53,7 +53,7 @@ REGRAS QUE VOCÊ NUNCA QUEBRA
    Em perguntas jurídicas (pode ou não pode, exceções, quem precisa de autorização), se a base não responder exatamente, diga que não tem essa confirmação e indique o Ipaam. Nunca afirme "sem exceção", "não precisa de autorização" ou "dispensa autorização".
    Para falar do tempo (seco, chuva, vento, amanhã), use consultar_tempo antes; nunca chute o tempo.
 6. Privacidade: o relato é anônimo por padrão. Não peça nome, CPF ou documento. Só registre um contato se a pessoa quiser se identificar. Se a pessoa disser que tem medo ou perguntar se dá para não se identificar, avise logo, antes do relato: o bot não guarda o nome, mas quem manda pelo WhatsApp do órgão ou liga do próprio celular aparece com o número; para anonimato total, Disque-Denúncia 181. Ao entregar um relato anônimo, repita esse aviso em uma frase (vem como aviso_anonimato).
-7. Antes de registrar um relato, confirme em uma frase o tipo e o que foi visto. O sistema exige isso: a primeira chamada de registrar_relato NÃO registra, só devolve o resumo para você mostrar à pessoa; chame de novo, com pessoa_confirmou=true, só depois que ela responder confirmando (se ela corrigir algo, chame com os dados corrigidos). Se a pessoa ainda não enviou a localização do que está vendo, peça uma vez (no Telegram: clipe 📎 > Localização); se ela não puder, registre mesmo assim. Nunca diga que você vai enviar o relato aos órgãos: você organiza o texto e a pessoa encaminha. Se a pessoa mandou foto, descreva objetivamente o que aparece (fumaça, chamas, área queimada, árvores derrubadas) sem tirar conclusões sobre culpados.
+7. Antes de registrar um relato, confirme em uma frase o tipo e o que foi visto. O sistema exige isso: a primeira chamada de registrar_relato NÃO registra, só devolve o resumo para você mostrar à pessoa; chame de novo, com pessoa_confirmou=true, só depois que ela responder confirmando (se ela corrigir algo, chame com os dados corrigidos). Depois de registrar, NÃO copie nem reescreva o texto do relato: o sistema envia o texto pronto logo depois da sua mensagem. Diga só o protocolo, para quem encaminhar e o aviso. Se a pessoa ainda não enviou a localização do que está vendo, peça uma vez (no Telegram: clipe 📎 > Localização); se ela não puder, registre mesmo assim. Nunca diga que você vai enviar o relato aos órgãos: você organiza o texto e a pessoa encaminha. Se a pessoa mandou foto, descreva objetivamente o que aparece (fumaça, chamas, área queimada, árvores derrubadas) sem tirar conclusões sobre culpados.
 8. Saúde: para falta de ar ou mal-estar pela fumaça, oriente procurar a UBS ou a emergência do SUS. Não dê diagnóstico nem remédio.
 9. O "nível de risco" do tempo é uma estimativa simples do protótipo, não índice oficial. Diga isso quando usar.
 10. Fora do tema (política, outros assuntos): diga com gentileza que só ajuda com fogo, fumaça, prevenção e relatos.
@@ -151,6 +151,8 @@ class Agente:
         # Relato em duas etapas (achado no teste de 15/11: a IA registrava sem confirmar nem pedir localização).
         self.turno: dict[int, int] = {}  # quantas mensagens a pessoa já mandou nesta conversa
         self.relato_proposto: dict[int, tuple[dict, int, datetime]] = {}  # (dados, turno, quando)
+        # O texto do relato vai para a pessoa exatamente como o código montou (a IA reescrevia, achado de 15/11).
+        self.relato_pronto: dict[int, str] = {}
 
     @property
     def ouve_audio(self) -> bool:
@@ -234,7 +236,7 @@ class Agente:
                 lat, lon, origem = enviado[0], enviado[1], "enviada"
             else:
                 lat, lon, origem = (u["lat"], u["lon"], "comunidade") if u else (None, None, None)
-            return relatos.registrar(
+            resultado = relatos.registrar(
                 tipo=args.get("tipo", "outro"),
                 descricao=args.get("descricao", ""),
                 descricao_foto=args.get("descricao_foto"),
@@ -246,7 +248,16 @@ class Agente:
                 origem_local=origem,
                 fotos=fotos,
             )
+            if resultado.get("texto_para_encaminhar"):
+                self.relato_pronto[chat_id] = resultado["texto_para_encaminhar"]
+                resultado = {**resultado, "texto_para_encaminhar":
+                             "(o sistema envia o texto pronto logo depois da sua resposta: não copie nem reescreva)"}
+            return resultado
         return {"erro": f"Ferramenta desconhecida: {nome}"}
+
+    def pegar_relato_pronto(self, chat_id: int) -> str | None:
+        """Texto do relato recém-registrado, exatamente como o código montou (uma vez só)."""
+        return self.relato_pronto.pop(chat_id, None)
 
     def _pedir_confirmacao(self, chat_id: int, args: dict) -> dict:
         tem_local = chat_id in self.local_relato
@@ -255,7 +266,7 @@ class Agente:
             passos.append("Peça UMA vez a localização do que a pessoa está vendo (no Telegram: clipe 📎 > Localização). "
                           "Se ela não puder, tudo bem: registre sem.")
         if args.get("anonimo", True) is not False:
-            passos.append("Avise em uma frase: " + relatos.AVISO_ANONIMATO)
+            passos.append("Se ainda não avisou nesta conversa, avise em uma frase: " + relatos.AVISO_ANONIMATO)
         passos.append("Só chame registrar_relato de novo, com pessoa_confirmou=true, depois que a pessoa responder confirmando.")
         return {
             "status": "AINDA NÃO REGISTRADO: falta a confirmação da pessoa",
@@ -345,3 +356,4 @@ class Agente:
         self.fotos_pendentes.pop(chat_id, None)
         self.local_relato.pop(chat_id, None)
         self.relato_proposto.pop(chat_id, None)
+        self.relato_pronto.pop(chat_id, None)

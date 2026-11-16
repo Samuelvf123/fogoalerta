@@ -471,3 +471,19 @@ async def test_relato_sem_confirmacao_ou_vencido_pede_de_novo(tmp_path, monkeypa
     assert chamadas == [] and prov.resultados[-1][0]["status"].startswith("AINDA NÃO")
     agente.limpar_conversa(7)
     assert 7 not in agente.relato_proposto
+
+
+async def test_texto_do_relato_sai_do_codigo_e_nao_da_ia(tmp_path, monkeypatch):
+    import fogoalerta.relatos as rel
+    monkeypatch.setattr(rel, "registrar", lambda **kw: {"protocolo": "FA-T", "texto_para_encaminhar": "RELATO FA-T\nTipo: Fogo ativo"})
+    pedido = {"tipo": "fogo_ativo", "descricao": "fogo"}
+    agente, prov = novo_agente(tmp_path, [
+        ferramenta("registrar_relato", pedido), texto("confere?"),
+        ferramenta("registrar_relato", {**pedido, "pessoa_confirmou": True}), texto("Registrado: FA-T."),
+    ])
+    await agente.responder(7, "registra")
+    assert agente.pegar_relato_pronto(7) is None
+    await agente.responder(7, "sim")
+    assert "RELATO" not in prov.resultados[-1][0]["texto_para_encaminhar"]  # a IA não recebe o texto para reescrever
+    assert agente.pegar_relato_pronto(7) == "RELATO FA-T\nTipo: Fogo ativo"
+    assert agente.pegar_relato_pronto(7) is None  # entregue uma vez só

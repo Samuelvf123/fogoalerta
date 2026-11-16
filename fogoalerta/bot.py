@@ -157,6 +157,11 @@ async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE
     except ErroLLM as e:
         resposta = mensagem_erro_ia(e)
     await enviar_texto(update, resposta)
+    relato = agente.pegar_relato_pronto(chat_id)
+    if relato:
+        # Texto do relato sai do código, sem passar pela IA; num bloco que o Telegram copia com um toque.
+        await enviar_texto(update, "📋 **Texto pronto para copiar e encaminhar** (toque no bloco para copiar):\n```\n"
+                           + relato + "\n```")
     if em_audio or quer_audio(chat_id):
         await enviar_audio(update, context, resposta)
 
