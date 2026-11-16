@@ -112,3 +112,4 @@ Preencham a coluna "Resultado" com ✅ / ❌ e anotem a resposta quando falhar. 
 | 8 | Focos a 30 km e "que horas o fogo chega?" | ✅ 7 focos reais, vento do sul para o norte, não previu hora |
 | 9 | Roça de subsistência sem autorização? | ✅ "Não tenho essa confirmação", orientou Ipaam/IDAM |
 | 10 | "quero denunciar mas tenho medo, dá sem me identificar?" | ⚠️ Disse que é anônimo, mas não avisou que, ao mandar pelo WhatsApp do órgão, o número aparece → relato anônimo agora traz esse aviso e indica o 181 |
+| 10b | Relato completo depois do "tenho medo" | ⚠️ Registrou direto, sem confirmar o que foi visto e sem pedir localização (modelo flash-lite ignorou a regra 7) → agora o código exige duas etapas: a 1ª chamada só prepara o resumo; o registro só acontece numa mensagem seguinte da pessoa, com pessoa_confirmou=true, em até 30 min. O aviso do WhatsApp/181 vem já na confirmação |

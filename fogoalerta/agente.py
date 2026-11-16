@@ -25,6 +25,7 @@ log = logging.getLogger(__name__)
 FUSO = ZoneInfo("America/Manaus")
 MAX_PASSOS = 6
 MAX_HISTORICO = 10  # mensagens (usuário + assistente) guardadas por conversa
+MINUTOS_CONFIRMAR_RELATO = 30  # depois disso, a proposta de relato vence e é preciso confirmar de novo
 HORAS_LEMBRAR_ALERTA = 24
 AVISO_SIMULACAO = "🧪 SIMULAÇÃO: os focos citados são fictícios, usados só para demonstração."
 
@@ -51,8 +52,8 @@ REGRAS QUE VOCÊ NUNCA QUEBRA
    Ao falar de leis e decretos, repita só o que a base diz, sem acrescentar palavras como "prorrogou", "total" ou datas novas.
    Em perguntas jurídicas (pode ou não pode, exceções, quem precisa de autorização), se a base não responder exatamente, diga que não tem essa confirmação e indique o Ipaam. Nunca afirme "sem exceção", "não precisa de autorização" ou "dispensa autorização".
    Para falar do tempo (seco, chuva, vento, amanhã), use consultar_tempo antes; nunca chute o tempo.
-6. Privacidade: o relato é anônimo por padrão. Não peça nome, CPF ou documento. Só registre um contato se a pessoa quiser se identificar. Ao entregar um relato anônimo, repita em uma frase o aviso_anonimato que vem no resultado da ferramenta (o número aparece se a pessoa mandar pelo WhatsApp do órgão; para anonimato total, 181).
-7. Antes de registrar um relato, confirme em uma frase o tipo e o que foi visto. Se a pessoa ainda não enviou a localização do que está vendo, peça uma vez (no Telegram: clipe 📎 > Localização); se ela não puder, registre mesmo assim. Nunca diga que você vai enviar o relato aos órgãos: você organiza o texto e a pessoa encaminha. Se a pessoa mandou foto, descreva objetivamente o que aparece (fumaça, chamas, área queimada, árvores derrubadas) sem tirar conclusões sobre culpados.
+6. Privacidade: o relato é anônimo por padrão. Não peça nome, CPF ou documento. Só registre um contato se a pessoa quiser se identificar. Se a pessoa disser que tem medo ou perguntar se dá para não se identificar, avise logo, antes do relato: o bot não guarda o nome, mas quem manda pelo WhatsApp do órgão ou liga do próprio celular aparece com o número; para anonimato total, Disque-Denúncia 181. Ao entregar um relato anônimo, repita esse aviso em uma frase (vem como aviso_anonimato).
+7. Antes de registrar um relato, confirme em uma frase o tipo e o que foi visto. O sistema exige isso: a primeira chamada de registrar_relato NÃO registra, só devolve o resumo para você mostrar à pessoa; chame de novo, com pessoa_confirmou=true, só depois que ela responder confirmando (se ela corrigir algo, chame com os dados corrigidos). Se a pessoa ainda não enviou a localização do que está vendo, peça uma vez (no Telegram: clipe 📎 > Localização); se ela não puder, registre mesmo assim. Nunca diga que você vai enviar o relato aos órgãos: você organiza o texto e a pessoa encaminha. Se a pessoa mandou foto, descreva objetivamente o que aparece (fumaça, chamas, área queimada, árvores derrubadas) sem tirar conclusões sobre culpados.
 8. Saúde: para falta de ar ou mal-estar pela fumaça, oriente procurar a UBS ou a emergência do SUS. Não dê diagnóstico nem remédio.
 9. O "nível de risco" do tempo é uma estimativa simples do protótipo, não índice oficial. Diga isso quando usar.
 10. Fora do tema (política, outros assuntos): diga com gentileza que só ajuda com fogo, fumaça, prevenção e relatos.
@@ -97,7 +98,7 @@ FERRAMENTAS = [
     },
     {
         "name": "registrar_relato",
-        "description": "Registra um relato de campo e devolve o protocolo, o órgão certo para encaminhar e um texto pronto para enviar. Use só depois de confirmar com a pessoa o tipo e o que foi visto.",
+        "description": "Registra um relato de campo e devolve o protocolo, o órgão certo e um texto pronto para enviar. Em duas etapas: a primeira chamada só prepara o resumo para a pessoa confirmar; a segunda, com pessoa_confirmou=true depois da resposta dela, registra.",
         "schema": {
             "type": "object",
             "properties": {
@@ -106,6 +107,7 @@ FERRAMENTAS = [
                 "descricao_foto": {"type": "string", "description": "Descrição objetiva da(s) foto(s) enviada(s), se houver."},
                 "anonimo": {"type": "boolean", "description": "true (padrão) se a pessoa não quiser se identificar."},
                 "contato": {"type": "string", "description": "Só se a pessoa quiser se identificar."},
+                "pessoa_confirmou": {"type": "boolean", "description": "true só quando a pessoa já respondeu confirmando o resumo que você mostrou."},
             },
             "required": ["tipo", "descricao"],
         },
@@ -146,6 +148,9 @@ class Agente:
         self.fotos_pendentes: dict[int, list[str]] = {}
         self.local_relato: dict[int, tuple[float, float]] = {}  # localização enviada para o próximo relato
         self.ultimo_alerta: dict[int, tuple[str, datetime]] = {}  # para entender "o que eu faço?" depois do alerta
+        # Relato em duas etapas (achado no teste de 15/11: a IA registrava sem confirmar nem pedir localização).
+        self.turno: dict[int, int] = {}  # quantas mensagens a pessoa já mandou nesta conversa
+        self.relato_proposto: dict[int, tuple[dict, int, datetime]] = {}  # (dados, turno, quando)
 
     @property
     def ouve_audio(self) -> bool:
@@ -213,6 +218,16 @@ class Agente:
             achados = self.base.buscar(str(args.get("pergunta", "")))
             return {"resultados": achados} if achados else {"resultados": [], "aviso": "Nada encontrado na base."}
         if nome == "registrar_relato":
+            proposto = self.relato_proposto.get(chat_id)
+            agora = datetime.now(FUSO)
+            confirmado = (args.get("pessoa_confirmou") is True and proposto is not None
+                          and proposto[1] < self.turno.get(chat_id, 0)
+                          and (agora - proposto[2]).total_seconds() < MINUTOS_CONFIRMAR_RELATO * 60)
+            if not confirmado:
+                self.relato_proposto[chat_id] = (dict(args), self.turno.get(chat_id, 0), agora)
+                return self._pedir_confirmacao(chat_id, args)
+            self.relato_proposto.pop(chat_id, None)
+            args = {**proposto[0], **args}
             fotos = self.fotos_pendentes.pop(chat_id, [])
             enviado = self.local_relato.pop(chat_id, None)
             if enviado:
@@ -233,6 +248,23 @@ class Agente:
             )
         return {"erro": f"Ferramenta desconhecida: {nome}"}
 
+    def _pedir_confirmacao(self, chat_id: int, args: dict) -> dict:
+        tem_local = chat_id in self.local_relato
+        passos = ["Mostre o resumo em uma ou duas frases (tipo e o que foi visto) e pergunte se está certo."]
+        if not tem_local:
+            passos.append("Peça UMA vez a localização do que a pessoa está vendo (no Telegram: clipe 📎 > Localização). "
+                          "Se ela não puder, tudo bem: registre sem.")
+        if args.get("anonimo", True) is not False:
+            passos.append("Avise em uma frase: " + relatos.AVISO_ANONIMATO)
+        passos.append("Só chame registrar_relato de novo, com pessoa_confirmou=true, depois que a pessoa responder confirmando.")
+        return {
+            "status": "AINDA NÃO REGISTRADO: falta a confirmação da pessoa",
+            "resumo": {"tipo": args.get("tipo"), "descricao": args.get("descricao"),
+                       "localizacao": "enviada pela pessoa" if tem_local else "ainda não enviada",
+                       "fotos": len(self.fotos_pendentes.get(chat_id, []))},
+            "instrucoes": passos,
+        }
+
     async def _rodar_ferramenta(self, chat_id: int, c: Chamada) -> dict:
         try:
             return await self._executar(chat_id, c.nome, c.args or {})
@@ -245,6 +277,8 @@ class Agente:
                         saude_avisada: bool = False) -> str:
         """imagem = (bytes, "image/jpeg") quando a pessoa manda foto. Erros do provedor sobem como ErroLLM."""
         texto = limpar_entrada(texto) or ("(a pessoa enviou uma foto)" if imagem else "")
+        if guardar_historico:
+            self.turno[chat_id] = self.turno.get(chat_id, 0) + 1
         historico = self.historico.get(chat_id, []) if guardar_historico else []
         conversa = self.provedor.nova_conversa(historico, texto, imagem)
         sistema = PROMPT_SISTEMA + self._contexto(chat_id)
@@ -310,3 +344,4 @@ class Agente:
         self.historico.pop(chat_id, None)
         self.fotos_pendentes.pop(chat_id, None)
         self.local_relato.pop(chat_id, None)
+        self.relato_proposto.pop(chat_id, None)

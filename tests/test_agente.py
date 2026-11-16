@@ -97,10 +97,14 @@ async def test_relato_usa_foto_pendente_e_e_anonimo(tmp_path, monkeypatch):
     monkeypatch.setattr(rel, "registrar", registrar_falso)
     agente, _ = novo_agente(tmp_path, [
         ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fumaça no ramal"}),
+        texto("Você viu fumaça no ramal, certo?"),
+        ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fumaça no ramal", "pessoa_confirmou": True}),
         texto("Relato FA-TESTE registrado. Ligue 193."),
     ])
     agente.fotos_pendentes[7] = ["foto1.jpg"]
     await agente.responder(7, "registra aí, por favor")
+    assert salvos == {} and agente.fotos_pendentes[7] == ["foto1.jpg"]  # 1ª etapa: ainda não registrou
+    await agente.responder(7, "isso, pode registrar")
     assert salvos["fotos"] == ["foto1.jpg"] and salvos["anonimo"] is True
     assert 7 not in agente.fotos_pendentes
 
@@ -283,15 +287,18 @@ async def test_relato_usa_localizacao_enviada_e_nao_a_sede(tmp_path, monkeypatch
     import fogoalerta.relatos as rel
     salvos = {}
     monkeypatch.setattr(rel, "registrar", lambda **kw: salvos.update(kw) or {"protocolo": "FA-T"})
-    agente, prov = novo_agente(tmp_path, [
-        ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fogo"}), texto("ok"),
-        ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fogo"}), texto("ok"),
-    ])
+    def relato_em_duas_etapas():
+        return [ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fogo"}), texto("confere?"),
+                ferramenta("registrar_relato", {"tipo": "fogo_ativo", "descricao": "fogo", "pessoa_confirmou": True}),
+                texto("ok")]
+    agente, prov = novo_agente(tmp_path, relato_em_duas_etapas() + relato_em_duas_etapas())
     agente.local_relato[7] = (-3.61, -59.10)
     await agente.responder(7, "registra")
     assert "JÁ enviou a localização" in prov.ultimo_sistema
+    await agente.responder(7, "sim")
     assert (salvos["lat"], salvos["lon"], salvos["origem_local"]) == (-3.61, -59.10, "enviada")
     await agente.responder(7, "registra outro")  # sem nova localização: usa a sede, marcada como referência
+    await agente.responder(7, "sim")
     assert salvos["origem_local"] == "comunidade" and salvos["lat"] == -3.58
 
 
@@ -415,3 +422,52 @@ async def test_agente_sabe_se_o_provedor_ouve_audio(tmp_path):
     agente_g = Agente(provedor=gemini, estado=Estado(tmp_path / "e2.json"))
     assert agente_g.ouve_audio
     assert await agente_g.transcrever_audio(b"a", "audio/ogg") == "socorro"
+
+
+# ------------------------------------------------------------ relato em duas etapas (achado de 15/11)
+async def test_relato_so_registra_depois_que_a_pessoa_confirma(tmp_path, monkeypatch):
+    import fogoalerta.relatos as rel
+    chamadas = []
+    monkeypatch.setattr(rel, "registrar", lambda **kw: chamadas.append(kw) or {"protocolo": "FA-T"})
+    pedido = {"tipo": "queimada_ilegal", "descricao": "fumaça no ramal do km 12"}
+    agente, prov = novo_agente(tmp_path, [
+        # 1ª mensagem: a IA tenta registrar duas vezes na mesma resposta, sem a pessoa ter confirmado
+        ferramenta("registrar_relato", pedido),
+        ferramenta("registrar_relato", {**pedido, "pessoa_confirmou": True}),
+        texto("Você viu fumaça no ramal do km 12, certo? Pode mandar a localização?"),
+        # 2ª mensagem: a pessoa confirma
+        ferramenta("registrar_relato", {**pedido, "pessoa_confirmou": True}),
+        texto("Registrado: FA-T."),
+    ])
+    await agente.responder(7, "vi fumaça no ramal do km 12, tenho medo")
+    assert chamadas == []
+    etapa1 = prov.resultados[0][0]
+    assert etapa1["status"].startswith("AINDA NÃO REGISTRADO")
+    assert any("localização" in passo for passo in etapa1["instrucoes"])  # sem localização: pede uma vez
+    assert any("181" in passo for passo in etapa1["instrucoes"])  # anônimo: avisa do WhatsApp e do 181 antes
+    assert prov.resultados[1][0]["status"].startswith("AINDA NÃO")  # mesma mensagem: não conta como confirmação
+    await agente.responder(7, "isso mesmo")
+    assert len(chamadas) == 1 and chamadas[0]["descricao"] == "fumaça no ramal do km 12"
+    assert 7 not in agente.relato_proposto
+
+
+async def test_relato_sem_confirmacao_ou_vencido_pede_de_novo(tmp_path, monkeypatch):
+    from datetime import timedelta
+    import fogoalerta.relatos as rel
+    chamadas = []
+    monkeypatch.setattr(rel, "registrar", lambda **kw: chamadas.append(kw) or {"protocolo": "FA-T"})
+    pedido = {"tipo": "fogo_ativo", "descricao": "fogo"}
+    agente, prov = novo_agente(tmp_path, [
+        ferramenta("registrar_relato", pedido), texto("confere?"),
+        ferramenta("registrar_relato", pedido), texto("confere de novo?"),  # sem pessoa_confirmou
+        ferramenta("registrar_relato", {**pedido, "pessoa_confirmou": True}), texto("ok"),  # vencido
+    ])
+    await agente.responder(7, "registra")
+    await agente.responder(7, "hum")
+    assert chamadas == []
+    dados, turno, quando = agente.relato_proposto[7]
+    agente.relato_proposto[7] = (dados, turno, quando - timedelta(minutes=31))
+    await agente.responder(7, "sim")
+    assert chamadas == [] and prov.resultados[-1][0]["status"].startswith("AINDA NÃO")
+    agente.limpar_conversa(7)
+    assert 7 not in agente.relato_proposto
