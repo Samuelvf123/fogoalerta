@@ -1,16 +1,83 @@
-# FogoAlerta 🔥🌳
+# FogoAlerta 🔥
 
-Agente de IA no Telegram para comunidades, agricultores e brigadistas do interior do Amazonas.
-Protótipo para o Desafio Saul Benchimol IA 2026. Área piloto: **Autazes**.
-
-O agente faz três coisas:
-1. **Alerta**: avisa sozinho quando o satélite detecta foco de calor perto da comunidade.
-2. **Orientação**: explica a proibição do fogo, o risco do dia e alternativas ao fogo. **Nunca autoriza queimada.**
-3. **Relato**: organiza o que a pessoa viu (texto, foto, áudio, localização), anônimo por padrão, e diz para onde encaminhar.
+**Agente de IA no Telegram que avisa, orienta e ajuda a relatar queimadas em comunidades do interior do Amazonas.**
+Projeto da Equipe FogoAlerta (Uninorte) no Desafio Saul Benchimol IA 2026. Área piloto: **Autazes**.
 
 ---
 
-## Passo a passo para rodar (faça na ordem)
+## Em 30 segundos
+
+- **O problema:** em 2026, Autazes teve 2.827 focos de calor de janeiro a 14 de outubro, o maior número da região de Manaus ([IPAM, no Portal Amazônia](https://portalamazonia.com/meio-ambiente/focos-de-calor-manaus-outubro-26/)). Os satélites já detectam o fogo, mas a informação fica em mapas e painéis; quem mora perto não é avisado, não sabe a quem relatar sem se expor e recebe boato pelo grupo.
+- **O que o FogoAlerta faz:**
+  1. **Avisa** sozinho quando surge foco de calor perto da comunidade, com a direção do vento.
+  2. **Orienta** sobre a proibição do fogo, os riscos e as alternativas sem queima. **Nunca autoriza queimada.**
+  3. **Ajuda a relatar** fogo, desmatamento ou grilagem, anônimo por padrão e sem acusar ninguém.
+- **Situação:** funcionando no Telegram com dados reais da NASA. Em 16/11/2026, o bot avisou sozinho de dois focos reais a 6,3 e 7,1 km de Autazes.
+
+## Veja funcionando
+
+| Alerta automático com dados reais (16/11/2026) | Pergunta por áudio |
+|---|---|
+| ![Alerta do bot: 2 focos de calor a 6,3 km e 7,1 km de Autazes, com a direção do vento](docs/img/alerta_real.jpg) | ![O bot mostra "Entendi" com o que ouviu e responde em texto e áudio](docs/img/voz.jpg) |
+| **Nunca autoriza queimar, nem para um "fiscal"** | **Relato anônimo, confirmado antes de registrar** |
+| ![O bot recusa liberar fogo no quintal e recusa um falso fiscal do Ipaam](docs/img/recusa.jpg) | ![O bot confirma o resumo, avisa sobre o anonimato e só então registra o protocolo](docs/img/relato_anonimo.jpg) |
+
+## O que ele entende e responde
+
+- **Texto livre e áudio:** a pessoa fala do jeito dela. O Gemini transcreve o áudio, o bot mostra "🎙️ Entendi: ..." e responde em texto e em voz.
+- **Focos de calor:** NASA FIRMS (satélites VIIRS), com distância, direção, horário e se o vento sopra para a comunidade.
+- **Tempo e qualidade do ar:** Open-Meteo, com o ar classificado pela escala do Conama (Boa, Moderada, Ruim...).
+- **Mensagem encaminhada:** mostra de quando é a mensagem original e compara com os dados de agora, sem chamar de "mentira".
+- **Relato:** confirma o que foi visto, pede a localização, avisa sobre o anonimato e gera protocolo e texto pronto para o órgão certo (Ipaam, Ibama, Disque-Denúncia 181, Bombeiros 193).
+- **Boletim para rádio comunitária:** um minuto de texto com os dados do dia, também em áudio.
+
+## Seguro por projeto: as regras ficam no código, não na IA
+
+A IA conversa e escolhe as ferramentas. O que é crítico é decidido por regras fixas, que a IA não consegue mudar:
+
+- Emergência ("o fogo tá chegando") → aviso fixo do **193** antes de qualquer resposta. Falta de ar → **SAMU 192**, sem indicar remédio.
+- Respostas que pareçam autorizar queimada são bloqueadas. Afirmações legais que a base não sustenta são trocadas por uma orientação segura.
+- O bot não acusa ninguém: registra o fato, nunca o nome de um suspeito.
+- O relato só é registrado depois que a pessoa confirma, e o texto enviado ao órgão é montado pelo código, não pela IA.
+- O relato anônimo avisa que, se a pessoa mandar pelo WhatsApp do órgão, o número dela aparece, e indica o 181 para anonimato total.
+- O alerta automático é um texto fixo, sem IA.
+
+## Como funciona
+
+```mermaid
+flowchart LR
+    P["Pessoa no Telegram<br/>texto, áudio, foto, localização"] --> R1(["Regras de entrada<br/>emergência 193 · saúde 192"])
+    R1 --> A["Agente de IA (Gemini)<br/>entende e escolhe a ferramenta"]
+    A --> F1["Focos de calor<br/>NASA FIRMS"]
+    A --> F2["Tempo, vento e ar<br/>Open-Meteo"]
+    A --> F3["Base de orientações<br/>decreto, Ipaam, sem fogo"]
+    A --> F4["Relatos<br/>protocolo e canal certo"]
+    A --> R2(["Regras de saída<br/>não autoriza, não acusa,<br/>não inventa lei"])
+    R2 --> P
+    T["A cada 30 min:<br/>alerta automático, sem IA"] --> P
+```
+
+## Testes e qualidade
+
+- **114 testes automáticos** (`python -m pytest`), sem internet e sem gastar cota da IA.
+- **29 problemas encontrados nos testes e corrigidos**, todos registrados em [`docs/casos_de_teste.md`](docs/casos_de_teste.md). Exemplos: a IA afirmava regras que não existem, registrava relato sem confirmar e reescrevia o texto do relato; o aviso do 193 disparava para fato de ontem.
+- **Baterias no Telegram, com dados reais:** pedido para queimar, falso fiscal, pedido de acusação, criança com falta de ar, roça de subsistência, mensagem de voz, denúncia com medo.
+
+## Custo e próximos passos
+
+- **Hoje:** quase R$ 0. Telegram, NASA FIRMS, Open-Meteo e o plano gratuito do Gemini não têm custo; o principal gasto é um servidor pequeno.
+- **No WhatsApp:** cerca de US$ 0,0068 por alerta no Brasil (5.000 alertas por mês ≈ US$ 34), e as primeiras 1.000 mensagens de atendimento do mês são grátis ([Meta](https://developers.facebook.com/docs/whatsapp/pricing)).
+- **Sem internet:** um ponto focal por comunidade recebe e repassa; o boletim vai para a rádio comunitária.
+- **Próximo passo:** piloto em Autazes com uma comunidade e uma brigada local, medindo alertas enviados, tempo até o aviso e relatos registrados; depois, WhatsApp e rádios.
+
+## Privacidade
+
+- O relato é anônimo por padrão; o contato só é guardado se a pessoa quiser se identificar. O áudio recebido não é salvo.
+- No plano gratuito do Gemini, o Google pode usar o conteúdo enviado para melhorar os produtos ([termos](https://ai.google.dev/terms)). Por isso o protótipo foi testado só pela equipe, e o piloto com pessoas reais usará o plano pago.
+
+---
+
+## Para rodar (equipe e desenvolvedores)
 
 ### 1. Instalar
 Precisa de **Python 3.11 ou mais novo**.
@@ -31,102 +98,60 @@ pip install -r requirements.txt
 | `FIRMS_MAP_KEY` | https://firms.modaps.eosdis.nasa.gov/api/map_key/ (chega por e-mail) |
 
 **Sobre o plano gratuito do Gemini:**
-- Os limites (pedidos por minuto e por dia) aparecem no AI Studio e valem por projeto. Para testes e demo costuma bastar; se aparecer erro de limite, espere um pouco.
+- Os limites (pedidos por minuto e por dia) aparecem no AI Studio e valem por projeto. Se aparecer erro de limite, espere um pouco.
 - Se o modelo estiver sobrecarregado (erro 503) ou sem cota (429), o bot tenta de novo e depois usa os modelos de `GEMINI_MODELOS_RESERVA`.
-- Rode `python scripts/listar_modelos_gemini.py` e confira no AI Studio qual modelo está gratuito para vocês. O padrão é `gemini-3.8-flash`; se der erro de modelo, troque `GEMINI_MODELO` no `.env` (ex.: `gemini-3.5-flash-lite`).
-- **Privacidade:** no plano gratuito, o Google pode usar o que é enviado para melhorar os produtos dele, e pessoas podem revisar. Nos testes, **não usem dados pessoais reais** de entrevistados. Na proposta, digam que a versão real usaria plano pago (sem esse uso dos dados).
-- Quiser usar Claude no lugar: `LLM_PROVEDOR=claude` + `ANTHROPIC_API_KEY` (pago à parte da assinatura do Claude).
+- Rode `python scripts/listar_modelos_gemini.py` para ver os modelos disponíveis e troque `GEMINI_MODELO` no `.env` se precisar.
+- **Não usem dados pessoais reais** nos testes (veja Privacidade).
+- Para usar Claude no lugar: `LLM_PROVEDOR=claude` + `ANTHROPIC_API_KEY` (cobrado à parte da assinatura do Claude).
 
 ### 3. Configurar
 Copie `.env.example` para `.env` e cole as chaves. **Nunca suba o `.env` para o GitHub** (ele já está no `.gitignore`).
 
 ### 4. Testar por partes (do mais simples ao completo)
 ```bash
-python -m pytest                    # 83 testes, sem internet e sem gastar cota
+python -m pytest                    # 114 testes, sem internet e sem gastar cota
 python scripts/testar_firms.py      # focos reais perto de Autazes + tempo (só precisa da FIRMS_MAP_KEY)
 python scripts/conversar.py         # conversa com o agente pelo terminal (precisa da GEMINI_API_KEY)
 python -m fogoalerta.bot            # o bot no Telegram
 ```
-No Telegram, abra o seu bot, mande `/start` e depois `/comunidade`.
+No Telegram, abra o seu bot, mande `/start` e depois `/comunidade`. `/versao` mostra a versão em uso.
 
-### 5. Modo demonstração (para o vídeo e a apresentação)
-Se não houver foco real perto de Autazes na hora da demo, coloque `MODO_DEMO=1` no `.env`.
-O bot passa a usar focos **simulados** (`data/demo_focos.csv`), e todas as mensagens avisam que é simulação.
-Na apresentação, digam isso abertamente: mostra honestidade e a banca entende.
-
-Para mostrar a **análise de vento** no vídeo, use também `DEMO_VENTO_GRAUS=90` (vento vindo do leste): o foco simulado a leste aparece com "⚠️ vento soprando na direção da comunidade".
-
----
+### 5. Modo demonstração
+Sem foco real perto de Autazes na hora da demo, coloque `MODO_DEMO=1` no `.env`: o bot usa focos **simulados** (`data/demo_focos.csv`) e todas as mensagens avisam que é simulação. Com `DEMO_VENTO_GRAUS=90` (vento vindo do leste), o foco simulado a leste aparece com "⚠️ vento soprando na direção da comunidade".
 
 ## Comandos do bot
-`/start` `/comunidade` `/focos` `/tempo` `/ar` (fumaça e qualidade do ar) `/boletim` (texto + áudio para rádio) `/relato`
-`/checar` (conferir um aviso recebido) `/alertas_on` `/alertas_off` `/audio_on` `/audio_off` `/privacidade` `/versao` `/limpar` `/ajuda`.
+`/start` `/comunidade` `/focos` `/tempo` `/ar` `/boletim` `/relato` `/checar` `/alertas_on` `/alertas_off` `/audio_on` `/audio_off` `/privacidade` `/versao` `/limpar` `/ajuda`.
+Também aceita texto livre, áudio (até 3 minutos), foto, localização e mensagens encaminhadas.
 
-- **Texto livre, foto e localização:** a IA descreve a foto para o relato; a localização enviada vai no relato.
-- **Mensagem encaminhada:** encaminhe ao bot um áudio ou texto que está circulando ("vai ter incêndio aí"). Ele mostra
-  **de quando é a mensagem original** e compara com os dados de satélite e do ar de agora, sem chamar de "mentira".
-- **Qualidade do ar:** PM2,5 médio de 24 h (Open-Meteo, modelo Copernicus/CAMS) classificado pelo **IQAr**
-  (Resolução Conama 506/2024): Boa, Moderada, Ruim, Muito ruim, Péssima. É estimativa regional por modelo.
-- **Vento x foco:** cada foco vem com a avaliação "vento a favor / de lado / contra" da comunidade (estimativa simples).
-- **Respostas em áudio:** com `edge-tts` (já está no requirements), o bot responde em voz quando a pessoa manda áudio,
-  ou sempre, com `/audio_on`. O `/boletim` sai também em áudio, pronto para a rádio tocar. Precisa de internet
-  (o texto passa pelo serviço de voz da Microsoft).
-- **Mensagem de voz:** a pessoa pode falar em vez de escrever. O Gemini transcreve o áudio, o bot mostra
-  "🎙️ Entendi: ..." para a pessoa conferir, e só então a mensagem passa pelas regras de segurança e pelo agente.
-  A resposta volta em texto e em áudio. Áudios de até 3 minutos; o áudio não é salvo. Com `LLM_PROVEDOR=claude`
-  (a API do Claude não recebe áudio), dá para usar o `faster-whisper` local: `pip install faster-whisper`.
-
----
-
-## Como funciona
-
-```
-Mensagem (texto, foto, ou voz → Gemini transcreve)
-         → [guardrail: emergência? manda 193 na hora, sem IA]
-         → Agente (Gemini ou Claude, via llm.py) decide quais ferramentas usar:
-              consultar_focos   → NASA FIRMS (focos por raio, distância e direção)
-              consultar_tempo   → Open-Meteo (calor, vento, dias sem chuva)
-              buscar_orientacao → base data/orientacoes/*.md (RAG simples)
-              registrar_relato  → data/relatos/relatos.jsonl + canal certo (data/canais.json)
-         → [guardrails de saída: aviso "foco não é incêndio"; bloqueia "pode queimar"]
-         → Resposta
-
-A cada 30 min: alertas.py procura focos novos perto de cada comunidade e avisa (mensagem fixa, sem IA).
-```
+## Arquivos
 
 | Arquivo | O que faz |
 |---|---|
-| `fogoalerta/agente.py` | Prompt do agente, ferramentas e o laço de chamadas de ferramenta |
-| `fogoalerta/llm.py` | Provedores de IA: Gemini (padrão) e Claude |
+| `fogoalerta/agente.py` | Prompt do agente, ferramentas, laço de chamadas e relato em duas etapas |
+| `fogoalerta/llm.py` | Provedores de IA: Gemini (padrão, também transcreve áudio) e Claude |
 | `fogoalerta/guardrails.py` | Regras que não dependem da IA |
 | `fogoalerta/firms.py` | Focos de calor (NASA FIRMS) e modo demonstração |
 | `fogoalerta/clima.py` | Tempo, vento e risco estimado (não é índice oficial) |
 | `fogoalerta/ar.py` | Qualidade do ar (PM2,5) e classificação IQAr |
-| `fogoalerta/encaminhada.py` | Checagem de mensagens encaminhadas (data original) |
-| `fogoalerta/voz.py` | Respostas em áudio (texto -> voz) |
 | `fogoalerta/propagacao.py` | Vento x foco: o vento leva o fogo para a comunidade? (estimativa simples) |
+| `fogoalerta/encaminhada.py` | Checagem de mensagens encaminhadas (data original) |
+| `fogoalerta/voz.py` | Respostas em áudio (texto → voz) |
 | `fogoalerta/conhecimento.py` | Busca na base de orientações |
-| `fogoalerta/relatos.py` | Registro de relatos e canais |
+| `fogoalerta/relatos.py` | Registro de relatos, canais e aviso de anonimato |
 | `fogoalerta/alertas.py` | Alerta automático |
 | `fogoalerta/bot.py` | Telegram |
-| `data/` | Comunidades, orientações, canais, focos de demonstração |
+| `data/` | Comunidades, orientações, canais de denúncia (com fontes), focos de demonstração |
+| `docs/casos_de_teste.md` | Casos de teste manuais e todos os achados corrigidos |
 
----
-
-## ⚠️ O que ainda precisa ser conferido pela equipe
-- [ ] **Coordenadas** da sede de Autazes (aproximadas) e das comunidades das entrevistas → `data/comunidades.json`.
-- [x] **Canais de denúncia** (Ipaam, Ibama, 181, Defesa Civil) → `data/canais.json`, conferidos em 15/11/2026 com as fontes no próprio arquivo.
-- [ ] **Texto do Decreto nº 55.339/2026**: exceções e prorrogação → `data/orientacoes/01_proibicao_e_regras.md`.
-- [ ] Detalhes técnicos das alternativas sem fogo (Embrapa/IDAM) → `02_alternativas_sem_fogo.md`.
-- [ ] Ajustar a base de orientações com o que apareceu nas **entrevistas**.
-
-## O que já foi testado e o que não
-- ✅ Testado (sem internet): leitura do CSV do FIRMS, distâncias e direções, risco do tempo, guardrails, busca na base, relatos, alertas sem repetição, laço do agente, conversão de mensagens do Gemini e do Claude (inclusive o formato do pedido HTTP do Gemini), inicialização do bot.
-- ❌ **Não testado ao vivo** (o ambiente onde foi escrito não acessa esses serviços): chamadas reais ao FIRMS, Open-Meteo, Telegram e Gemini. Rodem o passo 4 na ordem para confirmar.
-- Se as respostas do Flash ficarem fracas em algum caso, ajustem o prompt em `agente.py` antes de trocar de modelo.
+## O que ainda precisa ser conferido pela equipe
+- [ ] **Coordenadas** da sede de Autazes (aproximadas) e das comunidades do piloto → `data/comunidades.json`.
+- [x] **Canais de denúncia** (Ipaam, Ibama, 181, Defesa Civil) → `data/canais.json`, conferidos em 15/11/2026, com as fontes no arquivo.
+- [ ] **Texto oficial do Decreto nº 55.339/2026** (exceções e prorrogação) → `data/orientacoes/01_proibicao_e_regras.md`.
+- [ ] Detalhes técnicos das alternativas sem fogo (Embrapa/IDAM) → `data/orientacoes/02_alternativas_sem_fogo.md`.
 
 ## Limites conhecidos do protótipo
-- Se a pessoa encaminhar com **"ocultar nomes dos remetentes"** (o Telegram faz isso sozinho ao encaminhar as próprias mensagens das Mensagens Salvas), chega uma cópia e não um encaminhamento: o bot não vê a data original. A IA ainda confere o conteúdo com os dados de agora.
-- Conversas ficam só na memória (somem ao reiniciar). Relatos e comunidades ficam em arquivo.
+- O dado de satélite chega em até cerca de 3 horas depois da passagem ([NASA Earthdata](https://www.earthdata.nasa.gov/learn/articles/wildfire-articles/wildfires-cant-hide-from-earth-observing-satellites)) e fogo pequeno ou sob as árvores pode não aparecer. O bot não substitui o 193.
+- Se a pessoa encaminhar com "ocultar nomes dos remetentes" (o Telegram faz isso sozinho ao encaminhar das Mensagens Salvas), chega uma cópia: o bot não vê a data original, mas ainda confere o conteúdo com os dados de agora.
+- As conversas ficam só na memória (somem ao reiniciar). Relatos e comunidades ficam em arquivo.
 - O bot não envia nada aos órgãos: gera o texto para a pessoa encaminhar.
-- Telegram no protótipo; a versão final seria WhatsApp (API Business, com custo por mensagem) + SMS e rádio.
+- Telegram no protótipo; a versão do piloto vai para o WhatsApp (API oficial, paga por mensagem), com SMS e rádio.
