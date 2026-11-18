@@ -465,7 +465,9 @@ def main() -> None:
 
     log.info("FogoAlerta versão %s rodando com %s (%s). Modo demo: %s. Ctrl+C para parar.",
              VERSAO, agente.provedor.nome, agente.provedor.modelo, "LIGADO" if CONFIG.modo_demo else "desligado")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Se o Telegram estiver fora do ar na hora de ligar (ex.: "Bad Gateway", 18/11), o bot espera e tenta de novo
+    # em vez de fechar. Depois de ligado, a biblioteca já repete sozinha quando a conexão cai.
+    app.run_polling(allowed_updates=Update.ALL_TYPES, bootstrap_retries=-1)
 
 
 if __name__ == "__main__":
