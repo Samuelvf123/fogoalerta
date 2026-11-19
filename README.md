@@ -35,7 +35,7 @@ Projeto da Equipe FogoAlerta (Uninorte) no Desafio Saul Benchimol IA 2026. Área
 
 A IA conversa e escolhe as ferramentas. O que é crítico é decidido por regras fixas, que a IA não consegue mudar:
 
-- Emergência ("o fogo tá chegando") → aviso fixo do **193** antes de qualquer resposta. Falta de ar → **SAMU 192**, sem indicar remédio.
+- Emergência ("o fogo tá chegando") → aviso fixo do **193** antes de qualquer resposta, com o botão **📞 Ligar 193**, que abre o discador com o número já digitado ([página](https://samuelvf123.github.io/fogoalerta/ligar/)). Falta de ar → **SAMU 192**, com botão para ligar, sem indicar remédio.
 - Respostas que pareçam autorizar queimada são bloqueadas. Afirmações legais que a base não sustenta são trocadas por uma orientação segura.
 - O bot não acusa ninguém: registra o fato, nunca o nome de um suspeito.
 - O relato só é registrado depois que a pessoa confirma, e o texto enviado ao órgão é montado pelo código, não pela IA.
@@ -59,7 +59,7 @@ flowchart LR
 
 ## Testes e qualidade
 
-- **114 testes automáticos** (`python -m pytest`), sem internet e sem gastar cota da IA.
+- **119 testes automáticos** (`python -m pytest`), sem internet e sem gastar cota da IA.
 - **29 problemas encontrados nos testes e corrigidos**, todos registrados em [`docs/casos_de_teste.md`](docs/casos_de_teste.md). Exemplos: a IA afirmava regras que não existem, registrava relato sem confirmar e reescrevia o texto do relato; o aviso do 193 disparava para fato de ontem.
 - **Baterias no Telegram, com dados reais:** pedido para queimar, falso fiscal, pedido de acusação, criança com falta de ar, roça de subsistência, mensagem de voz, denúncia com medo.
 
@@ -109,7 +109,7 @@ Copie `.env.example` para `.env` e cole as chaves. **Nunca suba o `.env` para o 
 
 ### 4. Testar por partes (do mais simples ao completo)
 ```bash
-python -m pytest                    # 114 testes, sem internet e sem gastar cota
+python -m pytest                    # 119 testes, sem internet e sem gastar cota
 python scripts/testar_firms.py      # focos reais perto de Autazes + tempo (só precisa da FIRMS_MAP_KEY)
 python scripts/conversar.py         # conversa com o agente pelo terminal (precisa da GEMINI_API_KEY)
 python -m fogoalerta.bot            # o bot no Telegram

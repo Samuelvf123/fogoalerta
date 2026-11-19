@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Ligar agora · FogoAlerta</title>
+<!-- Página do botão "Ligar" do FogoAlerta. O Telegram não aceita link tel: em botão de bot,
+     então o botão abre esta página, e aqui um toque abre o discador com o número já digitado.
+     Sem cookies, sem rastreadores, sem nada externo: carrega rápido com internet fraca. -->
+<style>
+  :root { --fundo: #121620; --cartao: #222838; --texto: #F3EFE8; --apagado: #AEB6C4; --laranja: #FF7A1A; --vermelho: #E5383B; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 24px 16px 32px; }
+  .marca { font-weight: 700; color: var(--laranja); letter-spacing: 1px; margin: 0 0 4px; }
+  h1 { font-size: 26px; line-height: 1.2; margin: 0 0 20px; }
+  .ligar { display: flex; align-items: center; gap: 16px; text-decoration: none; color: var(--texto);
+           background: var(--cartao); border-radius: 18px; padding: 16px 20px; margin: 0 0 12px; border: 2px solid transparent; }
+  .ligar:focus-visible { outline: 3px solid var(--texto); outline-offset: 3px; }
+  .ligar .num { font-size: 40px; font-weight: 800; line-height: 1; min-width: 92px; }
+  .ligar .quem { font-size: 18px; }
+  .ligar .quem b { display: block; font-size: 20px; }
+  .ligar.principal { background: var(--vermelho); padding: 28px 20px; flex-direction: column; text-align: center; gap: 6px; }
+  .ligar.principal .num { font-size: 84px; min-width: 0; }
+  .ligar.principal .quem { font-size: 20px; }
+  .ligar.principal .toque { display: block; font-size: 22px; font-weight: 700; margin-top: 6px; }
+  .toque { display: none; }
+  .nota { color: var(--apagado); font-size: 16px; margin: 20px 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <p class="marca">FOGOALERTA</p>
+  <h1>Toque no número para abrir o telefone</h1>
+  <div id="lista">
+    <a class="ligar principal" id="n193" href="tel:193">
+      <span class="num">193</span>
+      <span class="quem"><b>Corpo de Bombeiros</b>Fogo agora, perto de pessoas, casas ou roças</span>
+      <span class="toque">📞 Tocar para ligar</span>
+    </a>
+    <a class="ligar" id="n192" href="tel:192">
+      <span class="num">192</span>
+      <span class="quem"><b>SAMU</b>Falta de ar forte, desmaio, lábios roxos</span>
+      <span class="toque">📞 Tocar para ligar</span>
+    </a>
+    <a class="ligar" id="n181" href="tel:181">
+      <span class="num">181</span>
+      <span class="quem"><b>Disque-Denúncia</b>Denunciar queimada sem se identificar</span>
+      <span class="toque">📞 Tocar para ligar</span>
+    </a>
+  </div>
+  <p class="nota">Ligações gratuitas, de qualquer celular. Se o telefone não abrir, digite o número.</p>
+  <p class="nota">Esta página não guarda nada sobre você.</p>
+</main>
+<script>
+  // O bot manda ?n=193 ou ?n=192: esse número vira o botão grande, no topo.
+  (function () {
+    var n = new URLSearchParams(location.search).get("n");
+    var alvo = n && /^(193|192|181)$/.test(n) ? document.getElementById("n" + n) : null;
+    if (!alvo) return;
+    var lista = document.getElementById("lista");
+    lista.querySelectorAll(".ligar").forEach(function (a) { a.classList.remove("principal"); });
+    alvo.classList.add("principal");
+    lista.insertBefore(alvo, lista.firstChild);
+  })();
+</script>
+</body>
+</html>

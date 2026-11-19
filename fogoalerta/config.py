@@ -40,6 +40,8 @@ class Config:
             "FIRMS_FONTES", "VIIRS_SNPP_NRT,VIIRS_NOAA20_NRT,VIIRS_NOAA21_NRT"
         ).split(",") if f.strip()
     )
+    # Página do botão "Ligar 193/192" (docs/ligar no GitHub Pages). Vazio = mensagens sem botão.
+    url_ligar: str = os.getenv("URL_LIGAR", "https://samuelvf123.github.io/fogoalerta/ligar/").strip()
     raio_alerta_km: int = _int("RAIO_ALERTA_KM", 10)
     intervalo_alerta_min: int = _int("INTERVALO_ALERTA_MIN", 30)
     pasta_dados: Path = RAIZ / "data"

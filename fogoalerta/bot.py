@@ -18,7 +18,7 @@ from telegram.error import BadRequest, NetworkError, TimedOut
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler,
                           ContextTypes, MessageHandler, filters)
 
-from . import VERSAO, alertas, audio, encaminhada, voz
+from . import VERSAO, alertas, audio, encaminhada, ligar, voz
 from .agente import Agente
 from .armazenamento import Estado
 from .config import CONFIG
@@ -136,6 +136,19 @@ def quer_audio(chat_id: int) -> bool:
     return bool(estado.preferencia(chat_id, "audio", False))
 
 
+async def enviar_aviso_fixo(mensagem, texto: str, numero: str) -> None:
+    """Aviso de emergência com o botão "📞 Ligar". Se o Telegram recusar o botão, o aviso sai sem ele:
+    o aviso nunca pode deixar de chegar por causa do botão."""
+    botao = ligar.teclado(numero)
+    if botao is not None:
+        try:
+            await mensagem.reply_text(texto, reply_markup=botao)
+            return
+        except BadRequest as e:
+            log.warning("Telegram recusou o botão Ligar %s (%s); aviso vai sem botão.", numero, e)
+    await mensagem.reply_text(texto)
+
+
 async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE, texto: str,
                               imagem: tuple[bytes, str] | None = None, em_audio: bool = False) -> None:
     chat_id = update.effective_chat.id
@@ -147,9 +160,9 @@ async def perguntar_ao_agente(update: Update, context: ContextTypes.DEFAULT_TYPE
     emergencia = detectar_emergencia(texto) and not origem
     saude = detectar_emergencia_saude(texto) and not origem
     if saude:
-        await update.effective_message.reply_text(MENSAGEM_SAUDE)
+        await enviar_aviso_fixo(update.effective_message, MENSAGEM_SAUDE, "192")
     if emergencia:
-        await update.effective_message.reply_text(MENSAGEM_EMERGENCIA)
+        await enviar_aviso_fixo(update.effective_message, MENSAGEM_EMERGENCIA, "193")
     await acao_no_chat(context, chat_id, ChatAction.TYPING)
     try:
         resposta = await agente.responder(chat_id, texto, imagem=imagem, emergencia_avisada=emergencia,

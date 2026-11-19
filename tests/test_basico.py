@@ -446,3 +446,54 @@ def test_emergencia_nao_dispara_para_fato_passado():
     assert detectar_emergencia("começou ontem e agora o fogo tá chegando na roça")  # passado, mas continua
     assert detectar_emergencia("o fogo tá chegando na roça")
     assert detectar_emergencia("socorro, ontem pegou fogo e de novo hoje")  # palavras fortes sempre valem
+
+
+# Botão "Ligar": quem está em pânico não precisa lembrar o número (achado da entrevista com o brigadista).
+from fogoalerta import ligar  # noqa: E402
+
+
+def test_botao_ligar_abre_a_pagina_com_o_numero():
+    t = ligar.teclado("193", base="https://exemplo.github.io/fogoalerta/ligar/")
+    botao = t.inline_keyboard[0][0]
+    assert botao.url == "https://exemplo.github.io/fogoalerta/ligar/?n=193"
+    assert "193" in botao.text and "Bombeiros" in botao.text
+    assert ligar.teclado("192", base="https://x.io/ligar").inline_keyboard[0][0].url == "https://x.io/ligar/?n=192"
+
+
+def test_botao_ligar_desligado_ou_numero_desconhecido():
+    assert ligar.teclado("193", base="") is None
+    assert ligar.teclado("190", base="https://x.io/ligar/") is None
+
+
+def test_pagina_de_ligar_tem_os_numeros_certos():
+    from pathlib import Path
+    pagina = (Path(__file__).resolve().parent.parent / "docs" / "ligar" / "index.html").read_text(encoding="utf-8")
+    for n in ligar.QUEM:
+        assert f'href="tel:{n}"' in pagina and f'id="n{n}"' in pagina
+    assert "http" not in pagina.split("<script>")[0].split("</style>")[1]  # nada externo no corpo da página
+
+
+class _MensagemFalsa:
+    def __init__(self, recusa_botao=False):
+        self.enviadas, self.recusa_botao = [], recusa_botao
+
+    async def reply_text(self, texto, reply_markup=None):
+        from telegram.error import BadRequest
+        if reply_markup is not None and self.recusa_botao:
+            raise BadRequest("Button_url_invalid")
+        self.enviadas.append((texto, reply_markup))
+
+
+async def test_aviso_de_emergencia_vai_com_botao():
+    from fogoalerta import bot
+    m = _MensagemFalsa()
+    await bot.enviar_aviso_fixo(m, guardrails.MENSAGEM_EMERGENCIA, "193")
+    texto, botao = m.enviadas[0]
+    assert texto == guardrails.MENSAGEM_EMERGENCIA and botao.inline_keyboard[0][0].url.endswith("?n=193")
+
+
+async def test_aviso_de_emergencia_chega_mesmo_se_o_botao_falhar():
+    from fogoalerta import bot
+    m = _MensagemFalsa(recusa_botao=True)
+    await bot.enviar_aviso_fixo(m, guardrails.MENSAGEM_EMERGENCIA, "193")
+    assert m.enviadas == [(guardrails.MENSAGEM_EMERGENCIA, None)]
