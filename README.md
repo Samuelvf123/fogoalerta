@@ -66,7 +66,7 @@ flowchart LR
 ## Custo e próximos passos
 
 - **Hoje:** quase R$ 0. Telegram, NASA FIRMS, Open-Meteo e o plano gratuito do Gemini não têm custo; o principal gasto é um servidor pequeno.
-- **No WhatsApp:** cerca de US$ 0,0068 por alerta no Brasil (5.000 alertas por mês ≈ US$ 34), e as primeiras 1.000 mensagens de atendimento do mês são grátis ([Meta](https://developers.facebook.com/docs/whatsapp/pricing)).
+- **No WhatsApp:** cerca de US$ 0,0068 por alerta no Brasil (5.000 alertas por mês ≈ US$ 34), e responder a quem escreveu nas últimas 24 horas é grátis ([Meta](https://developers.facebook.com/docs/whatsapp/pricing)).
 - **Sem internet:** um ponto focal por comunidade recebe e repassa; o boletim vai para a rádio comunitária.
 - **Próximo passo:** piloto em Autazes com uma comunidade e uma brigada local, medindo alertas enviados, tempo até o aviso e relatos registrados; depois, WhatsApp e rádios.
 
